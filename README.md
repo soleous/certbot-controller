@@ -1,6 +1,6 @@
 # certbot-controller (beta)
 ## What is certbot?
-In short, [certbot](https://github.com/certbot/certbot) is a tool that automates the process of acquiring and renewing SSL/TLS certificates from the CA/Third Party [Let's Encrypt](https://letsencrypt.org/). Not to put works in certbots mouth, so I quote:
+In short, [certbot](https://github.com/certbot/certbot) is a tool that automates the process of acquiring and renewing SSL/TLS certificates from the CA/Third Party [Let's Encrypt](https://letsencrypt.org/). Not to put works in certbot's mouth, so to quote:
 
 [certbot](https://github.com/certbot/certbot), _"Certbot is part of EFF’s effort to encrypt the entire Internet. Secure communication over the Web relies on HTTPS, which requires the use of a digital certificate that lets browsers verify the identity of web servers (e.g., is that really google.com?). Web servers obtain their certificates from trusted third parties called certificate authorities (CAs). Certbot is an easy-to-use client that fetches a certificate from Let’s Encrypt—an open certificate authority launched by the EFF, Mozilla, and others—and deploys it to a web server._
 
@@ -15,7 +15,7 @@ Certbot-controller is built on top of [certbot](https://github.com/certbot/certb
 * Optional plugin install using the official certbot plugins
 * Optional custom plugin install
 * The ability to install more than one plugin for a single docker instance
-* Optional “always up” with certbots recommended cron configuration for renewals
+* Optional “always up” with certbot's recommended cron configuration for renewals
 * Optional custom cronjob scheduling for certbot renewal
 * Optional custom cronjob sleep random maximum for certbot renewal
 * Optional custom renewal syntax
@@ -41,7 +41,7 @@ The core functionality is complete and added quality of life improvements will b
 Certbot-controller intentionally operates as close to certbot’s docker image as possible, however it includes required operations, such as non-root, ID mapping and plugin install. To run as “always up” using cron scheduling or include renewal-hooks, they need enabling.
 
 ### Unsolicited Advice
-If this is the first time using certbot, I would recommend creating a certificate in letsencrypts staging environment first, by adding ‘--staging’ to the command syntax.  Certbots public services will throttle duplicate certificates of the same name, limited to 5 certificates over a 7 day period. 
+If this is the first time using certbot, I would recommend creating a certificate in Let's Encrypt's staging environment first, by adding ‘--staging’ to the command syntax.  Certbot's public services will throttle duplicate certificates of the same name, limited to 5 certificates over a 7 day period. 
 
 When multiple certificates of the same name are created certbot will add a ‘-0000’ suffix. It can therefore help to name some certificates using, for example, ‘--cert-name subdomain.domain.tld-staging’.
 
@@ -51,16 +51,16 @@ When multiple certificates of the same name are created certbot will add a ‘-0
 | --- | --- | --- | --- |
 | PUID | 911 | 1000 | Sets the numeric user ID that certbot will run as within the container. This will map the host storage permissions to the guest container. |
 | PGID | 911 | 1000 | Sets the numeric group ID that certbot will run as within the container. This will map the host storage permissions to the guest container. |
-| CERTBOT_PLUGINS | none | certbot_dns_cloudflare | Installs offical certbot plugins from certbots github repository. |
+| CERTBOT_PLUGINS | none | certbot_dns_cloudflare | Installs official certbot plugins from certbot's github repository. |
 | HOOK_INSTALL | false | true | Installs renew-hooks packaged with certbot-controller. |
 | CERTBOT_RENEW_RUNONSTART | false | true | Runs renewal when the container starts. |
 | CERTBOT_RENEW_SYNTAX | none | `--deploy /config/hook.sh` | Extra syntax, for when 'certbot renew' is executed. |
 | CERTBOT_RENEW_CRON | false | true | Enables cron scheduling and the container will not exit after execution. |
 | CERTBOT_RENEW_CRON_SCHEDULE | `0 */12 * * *` (every 12th hour) | `*/5 * * * *` | Set [crontab](https://man7.org/linux/man-pages/man5/crontab.5.html) schedule to a custom value. |
-| CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 3600 | A sleep period is added to the cronjob and randomises the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0, however this isn't recommended. |
+| CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 3600 | A sleep period is added to the cronjob and randomizes the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0, however this isn't recommended. |
 
 ## Certbot Official Plugins
-Offical plugins are installed by download from certbot's github repository.  Default plugin names can be found in certbot's github using there directory or release name (kebab-case "-" or "_" are both accepted). For Example cloudflare's name is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare" or "certbot_dns_cloudflare".  All default plugins much be available as an asset in there releases.
+Official plugins are installed by download from certbot's github repository.  Default plugin names can be found in certbot's github using there directory or release name (kebab-case "-" or "_" are both accepted). For Example cloudflare's name is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare" or "certbot_dns_cloudflare".  All default plugins much be available as an asset in there releases.
 
 For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to true.
 
