@@ -12,10 +12,10 @@
 # file.
 # 
 # Default plugin names can be found in certbots github using there directory
-# or release name (with and without "-" or "_"). For Example cloudflare's name 
-# is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare"
-# or "certbot_dns_cloudflare".  All default plugins much be available as an
-# asset in there releases.
+# or release name (kebab-case "-" or "_" are both accepted). For Example 
+# cloudflare's name is "certbot-dns-cloudflare" so the plugin name is
+# "certbot-dns-cloudflare" or "certbot_dns_cloudflare".  All default plugins
+# much be available as an asset in there releases.
 # 
 # Certbot Github Repository: https://github.com/certbot/certbot
 # Certbot Releases: https://github.com/certbot/certbot/releases
