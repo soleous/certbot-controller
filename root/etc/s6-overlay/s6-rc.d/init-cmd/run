@@ -1,0 +1,72 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+##############################################################################
+#                                  init-cmd                                  #
+##############################################################################
+#
+# This program/oneshot service executes the docker CMD instruction. It works
+# by the ENTRYPOINT ('/entrypoint.sh') creating a file called 'command' and
+# this program/oneshot service execute it as the NON-ROOT user set via ENV
+# 'NON_ROOT_USER'.
+#
+# Program Documentation: https://github.com/soleous/certbot-controller
+
+##############################################################################
+#                                 VERSIONING                                 #
+##############################################################################
+VERSION="1.1"
+DATE="2026-08-30 12:50 UTC"
+AUTHOR="Soleous (https://github.com/soleous)"
+
+##############################################################################
+#                                    MAINS                                   #
+##############################################################################
+
+main() {
+  # script functional variables
+  ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
+
+  # script functional variables: console colours
+  GREEN='\033[0;32m'        # Green
+  YELLOW='\033[0;33m'       # Yellow
+  RED='\033[0;31m'          # Red
+  NC='\033[0m'              # No Colour
+
+
+  # script default variables: additions and changes
+  COMMAND_FILE="/etc/s6-overlay/s6-rc.d/init-cmd/command"
+
+
+  # docker cmd file presence and execute
+  if [[ -f "${COMMAND_FILE}" ]]; then
+    # output log before certbot run
+    echo "${ORIGIN_DIR}: info: command file present, executing command"
+    COMMAND="$(cat $COMMAND_FILE)"
+    echo -e "${GREEN}Run ($(date)): \"${COMMAND}\"${NC}"
+
+    # run command
+    s6-setuidgid ${NON_ROOT_USER} ${COMMAND}
+
+    # if error from command exit script
+    exiterr=$?
+    if [ ! ${exiterr} -eq 0 ]; then
+      echo "${ORIGIN_DIR}: error: When executing '${COMMAND}' as user '${NON_ROOT_USER}': command exited ${exiterr}"
+      exit ${exiterr}
+    fi
+  fi
+
+}
+
+##############################################################################
+#                                 FUNCTIONS                                  #
+##############################################################################
+
+#################################### None ####################################
+
+
+##############################################################################
+#                          Pass into main functions                          #
+##############################################################################
+
+main $@

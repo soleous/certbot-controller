@@ -1,0 +1,97 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+##############################################################################
+#                         init-certbot-hooks-install                         #
+##############################################################################
+#
+# This program/oneshot service automatically deploys renewal-hooks scripts
+# for certbot to execute when renewing certificates. There scripts automate
+# common tasks such as creating PFX files or deploying the certificates.
+#
+# For more information on hooks see the following certbot documentation:
+#   https://eff-certbot.readthedocs.io/en/stable/using.html#renewing-certificates
+#
+# Program Documentation: https://github.com/soleous/certbot-controller
+
+##############################################################################
+#                                 VERSIONING                                 #
+##############################################################################
+VERSION="1.2"
+DATE="2026-08-30 21:46 UTC"
+AUTHOR="Soleous (https://github.com/soleous)"
+
+##############################################################################
+#                                    MAINS                                   #
+##############################################################################
+
+main() {
+  # conditional exits
+  if [[ ! "${HOOK_INSTALL}" == true ]]; then
+    return 0
+  fi
+
+  # script functional variables
+  ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
+
+  # script default variables: additions and changes
+  CERTBOT_DIR_HOOKS="${CERTBOT_DIR_CONFIG}/renewal-hooks" # no leading /
+  CERTBOT_DIR_HOOKS_SOURCE="${CONTAINER_DIR_SCRIPTS}/letsencrypt/renewal-hooks" # no leading /
+
+  # create folder if doesn't exist
+  mkdir -p "${CERTBOT_DIR_HOOKS}"
+
+  certbot_hook_install "${CERTBOT_DIR_HOOKS_SOURCE}" "${CERTBOT_DIR_HOOKS}" "pre"
+  certbot_hook_install "${CERTBOT_DIR_HOOKS_SOURCE}" "${CERTBOT_DIR_HOOKS}" "post"
+  certbot_hook_install "${CERTBOT_DIR_HOOKS_SOURCE}" "${CERTBOT_DIR_HOOKS}" "deploy"
+
+}
+
+##############################################################################
+#                                 FUNCTIONS                                  #
+##############################################################################
+
+####################### Certbot Renewal-Hook Install  ########################
+
+function certbot_hook_install () {
+  SOURCE_ROOT=$1
+  DEST_ROOT=$2
+  HOOK_TYPE=$3
+
+  for SOURCE in ${SOURCE_ROOT}/${HOOK_TYPE}/*; do
+    # file name
+    FILE=$(basename $SOURCE)
+
+    # escape if no files are returned
+    if [[ $FILE == "*" ]]; then
+      return 0
+    fi
+
+    # source file version
+    SOURCE_FILE_VERSION="$(sed -nE 's/^version:\ (\d+\.\d+).*/\1/p' <<< $($SOURCE --version))"
+
+    # destination
+    DEST=${DEST_ROOT}/${HOOK_TYPE}/${FILE}
+
+    if [[ -f ${DEST} ]]; then
+      # destination file version
+      DEST_FILE_VERSION="$(sed -nE 's/^version:\ (\d+\.\d+).*/\1/p' <<< $($DEST --version))"
+
+      # checks if version are the same between source and destination
+      if [[ ! "$DEST_FILE_VERSION" == "$SOURCE_FILE_VERSION" ]]; then
+        echo "${ORIGIN_DIR}: info: Updating renewal-hook '${FILE}' to '${DEST_ROOT}/${HOOK_TYPE}'"
+        cp -a ${SOURCE} ${DEST}
+      fi
+    else
+      echo "${ORIGIN_DIR}: info: Install renewal-hook '${FILE}' to '${DEST_ROOT}/${HOOK_TYPE}'"
+      cp -a ${SOURCE} ${DEST}
+    fi
+  done
+
+}
+
+##############################################################################
+#                          Pass into main functions                          #
+##############################################################################
+
+main $@

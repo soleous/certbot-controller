@@ -1,0 +1,90 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+##############################################################################
+#                             init-certbot-renew                             #
+##############################################################################
+#
+# This program/oneshot service executes certbot commands presented to docker, 
+# by interacts with the file created by '/entrypoint.sh' called 'command'.
+# As non-root users are used for execution and services are dependencies. This
+# program executes the command correctly.  It also facilities other certbot
+# commands such as renew when "run on start".  However scheduled certbot renew
+# commands using cron are executed via cron rather than this program.
+#
+# Program Documentation: https://github.com/soleous/certbot-controller
+
+##############################################################################
+#                                 VERSIONING                                 #
+##############################################################################
+VERSION="1.1"
+DATE="2026-08-30 12:50 UTC"
+AUTHOR="Soleous (https://github.com/soleous)"
+
+##############################################################################
+#                                    MAINS                                   #
+##############################################################################
+
+main() {
+  # script functional variables
+  ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
+
+  # script functional variables: console colours
+  GREEN='\033[0;32m'        # Green
+  YELLOW='\033[0;33m'       # Yellow
+  RED='\033[0;31m'          # Red
+  NC='\033[0m'              # No Colour
+
+
+  # script default variables: additions and changes
+  CERTBOT_RENEW_COMMAND="certbot renew${CERTBOT_RENEW_SYNTAX/#/ }"
+  CERTBOT_CRONTAB_UPDATE_COMMAND="/etc/s6-overlay/s6-rc.d/init-certbot-crontab-config/run"
+
+
+  # run renew on start
+  if [[ $1 == "runonstart" ]]; then
+    if [[ ${CERTBOT_RENEW_RUNONSTART} == true ]]; then
+      # certbot renew on startup
+      echo "${ORIGIN_DIR}: info: Running renew on start: ${CERTBOT_RENEW_COMMAND}"
+      certbot_renew ${CERTBOT_RENEW_COMMAND}
+    fi
+  else
+    echo -e "${GREEN}Run ($(date)): \"${CERTBOT_RENEW_COMMAND}\"${NC}"
+    certbot_renew ${CERTBOT_RENEW_COMMAND}
+  fi
+
+  if [[ $CERTBOT_RENEW_CRON == true ]]; then
+    exec ${CERTBOT_CRONTAB_UPDATE_COMMAND}
+  else
+    echo 0 > /run/s6-linux-init-container-results/exitcode
+    exec /run/s6/basedir/bin/halt
+  fi
+
+}
+
+##############################################################################
+#                                 FUNCTIONS                                  #
+##############################################################################
+
+########################### Cronjob Certbot Renew ############################
+
+function certbot_renew() {
+  # ARG variable configuration
+  CERTBOT_RENEW_COMMAND=$@
+
+  # Execute certbot renew as non-root-user
+  if builtin command -v certbot >/dev/null 2>&1; then
+    s6-setuidgid ${NON_ROOT_USER} ${CERTBOT_RENEW_COMMAND}
+  else
+    exiterr=$?
+    echo "${ORIGIN_DIR}: error: 'certbot' not found: exit code ${exiterr}"
+    exit ${exiterr}
+  fi
+
+}
+
+##############################################################################
+#                          Pass into main functions                          #
+##############################################################################
+
+main $@

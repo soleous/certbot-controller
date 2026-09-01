@@ -1,0 +1,292 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+##############################################################################
+#                         cronfunc (cron functions)                          #
+##############################################################################
+#
+# This selection of functions are commonly used by other programs in relation
+# with modifying cronjobs for cron.
+#
+# In use:
+#   init-certbot-crontab-config
+#   cronfunc
+#
+# Documentation: https://github.com/soleous/certbot-controller
+
+##############################################################################
+#                                 FUNCTIONS                                  #
+##############################################################################
+
+#################################### Trim ####################################
+
+function trim() {
+  # Function information:
+  #   ARG1: string
+  #   PIPE: string
+  #
+  #   Used to trim spaces before, after and between strings.
+  #
+  #   Examples:
+  #     pipe:
+  #       echo "'$(echo "  I   have  spaces   " | trim)'"
+  #     argument:
+  #       echo "'$(trim "  I   have  spaces   ")'"
+
+
+  if (( ! $# == 0 )); then
+    # command argument input
+    trim="$*"
+  else
+    # piped value input
+    # note: piped values naturally strip leading and trailing whitespace
+    read trim
+  fi
+
+  trim="$(sed -E 's/^ {1,}//g' <<< ${trim})" # leading whitespace
+  trim="$(sed -E 's/ {1,}/ /g' <<< ${trim})" # trailing whitespace
+  trim="$(sed -E 's/ {1,}$//g' <<< ${trim})" # multiple to single space
+  echo "${trim}"
+
+}
+
+############################### Modify Cronjob ###############################
+
+function crontab_mod() {
+  # Function information:
+  #   ARG --method       "value" [required]      = Method
+  #   ARG --cronjob      "value" [add/update]    = Cronjob
+  #   ARG --cronjob-id   "value" [remove/update] = Unique Identifier
+  #   ARG --cronjob-name "value" [optional]      = Friendly Name
+  #
+  #   Add a cronjob to user. This function uses crontab rather editing files.
+  #   This is two reasons:
+  #     1: Its better practice to allow a service to control itself using 
+  #        its intended functionality.
+  #     2: Enabling a non-privileged user to edit its own crontab file 
+  #        although works can be less secure as additional privileges are  
+  #        required. To enable this it also requires some workarounds for  
+  #        privileged and non-privileged users to function within a single 
+  #        environment. Using crontab does not require workarounds, although
+  #        it more complex to program.
+  #   
+  #   Arguments:
+  #           --method: Method (required)
+  #                     Type of action, add, update or remove.
+  #          --cronjob: Cronjob (required for add and update)
+  #                     The full cronjob including schedule and command.
+  #       --cronjob-id: Unique Identifier (required for remove and update)
+  #                     Anything that Unique Identifies the cronjob, such as
+  #                     command or comment (e.g. #cronjob added by service).
+  #     --cronjob-name: Cronjob Friendly Name (optional)
+  #                     Friendly Name that can differ from the cronjob and is
+  #                     displayed in the logs.
+
+
+  # script functional variables
+  ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
+
+
+  # ARG variable configuration
+  if [ $# == 0 ]; then
+    echo "${ORIGIN_DIR}: error: [${FUNCNAME}] requires arguments"
+    ARGERR=:
+  fi
+
+  until [ $# == 0 ]; do
+    case $1 in
+      --method)
+        METHOD="${2}"
+        shift
+        ;;
+      --cronjob)
+        CRONJOB="${2}"
+        shift
+        ;;
+      --cronjob-id)
+        CRONJOB_ID="${2}"
+        shift
+        ;;
+      --cronjob-name)
+        CRONJOB_NAME="${2}"
+        shift
+        ;;
+    esac
+    shift
+  done
+
+  # ARG error handling
+  if [[ $METHOD == "add" ]]; then
+    if [[ ! ${CRONJOB} ]]; then
+      echo "${ORIGIN_DIR}: [${FUNCNAME}] error: '--cronjob' required"
+    fi
+  elif [[ $METHOD == "update" ]]; then
+    if [[ ! ${CRONJOB} || ! ${CRONJOB_ID} ]]; then
+      echo "${ORIGIN_DIR}: [${FUNCNAME}] error: '--cronjob' and '--cronjob-id' required"
+    fi
+  elif [[ $METHOD == "remove" ]]; then
+    if [[ ! ${CRONJOB_ID} ]]; then
+      echo "${ORIGIN_DIR}: [${FUNCNAME}] error: '--cronjob-id' required"
+    fi
+  else
+    echo "${ORIGIN_DIR}: [${FUNCNAME}] error: incorrect method"
+  fi
+
+
+  # script default variables: additions and changes
+  CRONJOB_ID=${CRONJOB_ID//\//\\/}
+  CRONJOB_NAME=${CRONJOB_NAME:-${CRONJOB}}
+
+
+  # Methods for changing cronjobs
+  if [ ${METHOD} == "add" ]; then
+    # add cronjob
+    echo "${ORIGIN_DIR}: info: Adding cronjob: ${CRONJOB_NAME}"
+    (busybox crontab -l 2>/dev/null;echo "${CRONJOB}") | busybox crontab - 2> >(sed '/\.cache\/crontab/d') >- | tee /dev/stderr
+    
+    # If error from adding to crontab command exit
+    exiterr=$?
+    if [ ${exiterr} -ne 0 ]; then
+      echo "${ORIGIN_DIR}: [${FUNCNAME}] error: [add] failed adding cronjob '${CRONJOB_NAME}': exit code ${exiterr}"
+      return ${exiterr} 
+    fi
+  elif [ ${METHOD} == "update" ]; then
+    # update cronjob
+    echo "${ORIGIN_DIR}: info: Updating cronjob: ${CRONJOB_NAME}"
+    (busybox crontab -l 2>/dev/null | sed "/${CRONJOB_ID}/d"; echo "${CRONJOB}") | busybox crontab - 2> >(sed '/\.cache\/crontab/d') >- | tee /dev/stderr
+  
+    # If error from adding to crontab command exit
+    exiterr=$?
+    if [ ${exiterr} -ne 0 ]; then
+      echo "${ORIGIN_DIR}: [${FUNCNAME}] error: [update] failed updating cronjob '${CRONJOB_NAME}': exit code ${exiterr}"
+      return ${exiterr} 
+    fi
+  elif [ ${METHOD} == "remove" ]; then
+    # remove cronjob # untested
+    echo "${ORIGIN_DIR}: info: Removing cronjob: ${CRONJOB_NAME}"
+    (busybox crontab -l 2>/dev/null | sed "/${CRONJOB_ID}/d") | busybox crontab - 2> >(sed '/\.cache\/crontab/d') >- | tee /dev/stderr
+  
+    # If error from adding to crontab command exit
+    exiterr=$?
+    if [ ${exiterr} -ne 0 ]; then
+      echo "${ORIGIN_DIR}: [${FUNCNAME}] error: [remove] failed removing cronjob '${CRONJOB_NAME}': exit code ${exiterr}"
+      return ${exiterr} 
+    fi
+
+  fi
+
+}
+
+##################### Cronjob Schedule Terminal Output #######################
+
+function terminal_cron_schedule() {
+  #ARG1 ($1) [required] = User
+  #ARG2 ($2) [required] = Unique Identifier (Command or Comment)
+  #ARG2 ($3) [required] = Cronjob Name
+  #ARG3 ($4) [optional] = Random Max Sleep
+
+  # This outputs to terminal a human readable job schedule of a cronjob for 
+  # the docker logs. It collects data from the crontab file and uses cronie's
+  # 'cronnext' command to make it easy to understand the next run. 
+  # 
+  # Dependencies:
+  #   cronie
+  #   
+  # Arguments:
+  #   1: User (required)
+  #        User of the cronjob
+  #   2: Unique Identifier (required)
+  #        Used to identify the cronjob of the user. This can be the full
+  #        command, partial command or comment. Comments can used to 
+  #        uniquely "tag" a cronjob.
+  #   3: Cronjob Name (required)
+  #        This will be displayed within the schedule output.
+  #   4: Sleep Max (optional)
+  #        A sleep command is commonly used with cron to delay an execution.
+  #        For example "sleep 120 && command" will wait 2 minutes before
+  #        executing the "command". It is sometimes used to randomize an
+  #        execution. This optional argument defines the maximum value of 
+  #        a random sleep to output its maximum time to a user.  If "0" or
+  #        nothing is defined, this cosmetic output will not be displayed.
+
+
+  # script functional variables
+  ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
+
+  # script functional variables: console colours
+  GREEN='\033[0;32m'        # Green
+  YELLOW='\033[0;33m'       # Yellow
+  RED='\033[0;31m'          # Red
+  NC='\033[0m'              # No Colour
+
+
+  # ARG variable configuration
+  CRONJOB_ID=$1
+  CRONJOB_NAME=$2
+  CMD_SLEEP_MAX=$(test $3 && echo $3 || echo 0)
+
+
+  # amount of cronjobs with tag, logic only one is expected
+  CRONJOBS=$(busybox crontab -l 2>/dev/null | sed -nE "/${CRONJOB_ID//\//\\/}/p")
+
+  if [[ "$(cat <<< ${CRONJOBS} | wc -l)" -eq 1  ]]; then
+    CRONJOB="$(sed -nE "/${CRONJOB_ID//\//\\/}/p" <<< ${CRONJOBS} | trim)"
+  elif [[ "$(cat <<< ${CRONJOBS} | wc -l)" > 1  ]]; then
+    echo "${ORIGIN_DIR}: [${FUNCNAME}] error: too many cronjobs with the same unique identifier"
+    return 0
+  else
+    return 0
+  fi
+
+
+  # cronjob schedule different formats
+  if [[ ! ${CRONJOB} =~ ^\@ ]]; then
+    SCHEDULE="$(IFS=' ' read -a array <<< "${CRONJOB}"; echo "${array[*]:0:5}")"
+  else
+    SCHEDULE="$(sed -nE 's/^(@\w*)(.*)$/\1/p' <<< ${CRONJOB})"
+  fi
+
+
+  # sleep command value (if no value set to 0)
+  CMD_SLEEP=$(echo "${CRONJOB//"${SCHEDULE}" }" | sed -nE "s/^sleep (\d+) && .*$/\1/p")
+  CMD_SLEEP=$(test $CMD_SLEEP && echo ${CMD_SLEEP} || echo 0)
+
+
+  # cronnext date formatting for terminal output
+  CRONNEXT="$(date -d @$(($(cronnext -j "${CRONJOB_ID}" | sed -nE 's/(^.*next: )(.*)/\2/p') + ${CMD_SLEEP})))"
+  if [[ -z "${CRONNEXT}" ]]; then
+    CRONNEXT="Error in CRONNEXT syntax..."
+  fi
+
+
+  # terminal output
+  echo -e "${YELLOW}"
+  echo -e "      *********************************************************************"
+  echo -e "      $(printf "*%-67s*" " ${CRONJOB_NAME} Cronjob Schedule:")"
+  echo -e "      $(printf "*%67s*")"
+  if [[ ! ${SCHEDULE} =~ ^\@ ]]; then
+    IFS=' ' read -a SCHEDULE <<< "${SCHEDULE}"
+    echo -e "      $(printf "*%12s : %-52s*" "min" "${SCHEDULE[0]}")"
+    echo -e "      $(printf "*%12s : %-52s*" "hour" "${SCHEDULE[1]}")"
+    echo -e "      $(printf "*%12s : %-52s*" "day" "${SCHEDULE[2]}")"
+    echo -e "      $(printf "*%12s : %-52s*" "month" "${SCHEDULE[3]}")"
+    echo -e "      $(printf "*%12s : %-52s*" "weekday" "${SCHEDULE[4]}")"
+  else
+    echo -e "      $(printf "*%12s : %-52s*" "keyword" "${SCHEDULE}")"
+  fi
+  if [[ ${CMD_SLEEP} != 0 ]]; then
+    echo -e "      $(printf "*%67s*")"
+    if [[ ${CMD_SLEEP_MAX} != 0 ]]; then
+      echo -e "      $(printf "*%12s : %-52s*" "exe. sleep" "$(date -d @${CMD_SLEEP} -u +%H:%M:%S) (random time within $(date -d @${CMD_SLEEP_MAX} -u +%H:%M:%S))")"
+    else
+      echo -e "      $(printf "*%12s : %-52s*" "exe. sleep" "$(date -d @${CMD_SLEEP} -u +%H:%M:%S)")"
+    fi
+  fi
+  echo -e "      $(printf "*%67s*")"
+  echo -e "      $(printf "*%12s : %-52s*" "next run" "${CRONNEXT}")"
+  echo -e "      *********************************************************************"
+  echo -e "${NC}"
+
+  return $?
+
+}

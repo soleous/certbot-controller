@@ -1,0 +1,133 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+##############################################################################
+#                        init-certbot-crontab-config                         #
+##############################################################################
+#
+# This program/oneshot service creates the certbot renew cronjob. It follows
+# Certbot's best practices by randomizing the cronjob using sleep. However
+# it can be customized using environmental variables, normally defined within
+# Docker ENV.
+#
+# To do:
+#   1: Crontab: has issues with folders and permissions for when it performs
+#      a backup on execution. This is by default and cannot be disabled in 
+#      this version. A workaround has been used to suppress the error, but
+#      in the next version, there are options to disable backup functions.
+#      NOTE: I didn't add enough info on what this workaround is... So having
+#            looked into it, it appears to be 'crontab', not 'busybox
+#            crontab'. when running 'crontab -e' and editing a file, it
+#            reports:
+#            "Backup of root's previous crontab saved to 
+#            /root/.cache/crontab/crontab.bak".
+#
+#            It appears I added "2> >(sed '/\.cache\/crontab/d')" to suppress
+#            messages when unable to write to this '.cache/crontab' file. IIRC
+#            this was erroring when using 'busybox crontab' and it isn't
+#            anymore.  But I have not removed this code yet, until I can test
+#            fully, in the future.  So this remains... for now.
+#
+# Program Documentation: https://github.com/soleous/certbot-controller
+
+##############################################################################
+#                                 VERSIONING                                 #
+##############################################################################
+VERSION="1.1"
+DATE="2026-08-30 12:50 UTC"
+AUTHOR="Soleous (https://github.com/soleous)"
+
+##############################################################################
+#                                    MAINS                                   #
+##############################################################################
+
+main() {
+  # script functional variables
+  ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
+
+
+  # conditional exits
+  if [[ ! "${CERTBOT_RENEW_CRON}" == true ]]; then
+    return 0
+  fi
+
+
+  # verify crontab commands can execute
+  if ! ( builtin command -v busybox >/dev/null 2>&1 && [[ $(busybox || true) =~ [[:space:]](crontab)([,]|$) ]] ); then
+    # error: error with crontab command execution
+    exiterr=1
+    echo "${ORIGIN_DIR}: error: 'crontab' not found: exit code ${exiterr}"
+    return ${exiterr}
+  fi
+
+
+  # verify crontab edit config
+  if [[ "$( (busybox crontab -l 2>/dev/null) | busybox crontab - 2> >(sed '/\.cache\/crontab/d') >- | tee /dev/stderr )" ]]; then
+    # error: error editing crontab config
+    exiterr=1
+    echo "${ORIGIN_DIR}: error: Error editing crontab: exit code ${exiterr}"
+    return ${exiterr}
+  fi
+
+  # script default variables: additions and changes
+  if [[ ${CERTBOT_RENEW_CRON_SCHEDULE} ]] && [[ ! ${CERTBOT_RENEW_CRON_MAX_SLEEPTIME} ]]; then
+    #defaults to 0 if ENV CERTBOT_RENEW_CRON_SCHEDULE is set with no CERTBOT_RENEW_CRON_MAX_SLEEPTIME
+    CERTBOT_RENEW_CRON_MAX_SLEEPTIME=0
+  fi
+  : ${CERTBOT_RENEW_CRON_SCHEDULE:="0 */12 * * *"}
+  #: ${CERTBOT_RENEW_CRON_MAX_SLEEPTIME:="$((43200 - 1))"} # removed to allow math in ENV
+  CERTBOT_RENEW_CRON_MAX_SLEEPTIME=$((${CERTBOT_RENEW_CRON_MAX_SLEEPTIME:-"(43200 - 1)"}))
+  CERTBOT_RENEW_CRON_SLEEPTIME="$([[ ${CERTBOT_RENEW_CRON_MAX_SLEEPTIME} -ne 0 ]] && echo $((RANDOM % ${CERTBOT_RENEW_CRON_MAX_SLEEPTIME})) || echo 0)"
+  CERTBOT_RENEW_COMMAND="/etc/s6-overlay/s6-rc.d/init-certbot-renew/run"
+  CERTBOT_RENEW_COMMAND_FRIENDLY="certbot renew${CERTBOT_RENEW_SYNTAX/#/ }"
+
+  CERTBOT_RENEW_CRON_COMMAND="sleep ${CERTBOT_RENEW_CRON_SLEEPTIME} && ${CERTBOT_RENEW_COMMAND}"
+  CERTBOT_RENEW_CRONJOB="${CERTBOT_RENEW_CRON_SCHEDULE} ${CERTBOT_RENEW_CRON_COMMAND}"
+
+
+  # amount of cronjobs with ID/command, logic only one is expected
+  CRONJOB_ID_TOTAL=$(busybox crontab -l 2>/dev/null | sed -nE "/${CERTBOT_RENEW_COMMAND//\//\\/}/p" | wc -l)
+
+  if [[ ${CRONJOB_ID_TOTAL} -eq 0  ]]; then
+    # add cronjob
+    crontab_mod "--method" "add" "--cronjob" "${CERTBOT_RENEW_CRONJOB}" "--cronjob-name" "${CERTBOT_RENEW_COMMAND_FRIENDLY}"
+
+    exiterr=$?
+    if [ ${exiterr} -ne 0 ]; then
+      echo ${exiterr} > /run/s6-linux-init-container-results/exitcode
+      exec /run/s6/basedir/bin/halt
+    fi
+  elif [[ ${CRONJOB_ID_TOTAL} -eq 1  ]]; then
+    # update cronjob
+    crontab_mod "--method" "update" "--cronjob" "${CERTBOT_RENEW_CRONJOB}" "--cronjob-id" "${CERTBOT_RENEW_COMMAND}" "--cronjob-name" "${CERTBOT_RENEW_COMMAND_FRIENDLY}"
+
+    exiterr=$?
+    if [ ${exiterr} -ne 0 ]; then
+      echo ${exiterr} > /run/s6-linux-init-container-results/exitcode
+      exec /run/s6/basedir/bin/halt
+    fi
+  elif [[ ${CRONJOB_ID_TOTAL} > 1  ]]; then
+    # error: too many cronjobs
+    echo "${ORIGIN_DIR}: error: Too many cronjobs with the same unique identifier"
+    echo ${exiterr} > /run/s6-linux-init-container-results/exitcode
+    exec /run/s6/basedir/bin/halt
+  fi
+
+
+  terminal_cron_schedule "${CERTBOT_RENEW_COMMAND}" "Certbot Renew" "${CERTBOT_RENEW_CRON_MAX_SLEEPTIME}"
+
+}
+
+##############################################################################
+#                                 FUNCTIONS                                  #
+##############################################################################
+
+######################## Functions Sourced from file #########################
+
+source /etc/s6-overlay/s6-rc.d/init-certbot-crontab-config/cronfunc
+
+##############################################################################
+#                          Pass into main functions                          #
+##############################################################################
+
+main $@

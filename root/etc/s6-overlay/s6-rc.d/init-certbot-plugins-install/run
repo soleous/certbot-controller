@@ -1,0 +1,183 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+##############################################################################
+#                        init-certbot-plugins-install                        #
+##############################################################################
+#
+# This program/oneshot service automatically installs certbot plugins.  
+# Default plugin can be downloaded and installed, while custom plugins can be
+# installed, if they are uncompressed and within a folder in the plugins 
+# directory '/config/plugins/name-of-plugin'.  There must have a 'setup.py' 
+# file.
+# 
+# Default plugin names can be found in certbots github using there directory
+# or release name (with and without "-" or "_"). For Example cloudflare's name 
+# is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare"
+# or "certbot_dns_cloudflare".  All default plugins much be available as an
+# asset in there releases.
+# 
+# Certbot Github Repository: https://github.com/certbot/certbot
+# Certbot Releases: https://github.com/certbot/certbot/releases
+#
+# Program Documentation: https://github.com/soleous/certbot-controller
+
+##############################################################################
+#                                 VERSIONING                                 #
+##############################################################################
+VERSION="1.1"
+DATE="2026-08-30 12:50 UTC"
+AUTHOR="Soleous (https://github.com/soleous)"
+
+##############################################################################
+#                                    MAINS                                   #
+##############################################################################
+
+main() {
+  # script functional variables
+  ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
+
+
+  # script default variables: additions and changes
+  CERTBOT_VERSION="$(certbot --version | sed -nE 's/(^.*certbot )(.*)/\2/p')"
+  CERTBOT_DIR_PLUGINS_LOG="${CERTBOT_DIR_PATH}/logs/plugin-install" # no leading /
+  CERTBOT_DIR_PLUGINS_CERTBOT="/opt/certbot/src/plugins" # no leading /
+  CERTBOT_DIR_PLUGINS_CUSTOM="${CERTBOT_DIR_PLUGINS}" # no leading /
+
+
+  # create folder if doesn't exist
+  mkdir -p "${CERTBOT_DIR_PLUGINS_CERTBOT}"
+
+
+  # script default variables: additions and changes
+  CERTBOT_PLUGINS=$(sed -E 's/ {1,}/ /g' <<< ${CERTBOT_PLUGINS})
+  IFS=' ' read -a CERTBOT_PLUGINS <<< "${CERTBOT_PLUGINS}"
+
+
+  # Install official plugins using CERTBOT_PLUGINS variable from ENV
+  for PLUGIN_ENV in "${CERTBOT_PLUGINS[@]}"; do
+    PLUGIN="${PLUGIN_ENV//-/_}-${CERTBOT_VERSION}"
+    PLUGIN_PATH="${CERTBOT_DIR_PLUGINS_CERTBOT}/${PLUGIN}"
+
+    if [[ ! -d "${PLUGIN_PATH}" ]]; then
+      echo "${ORIGIN_DIR}: info: Installing official plugin: ${PLUGIN}"
+
+      # Download Certbots plugin
+      PLUGIN_URL="https://github.com/certbot/certbot/releases/download/v${CERTBOT_VERSION}/${PLUGIN}.tar.gz"
+      echo "${ORIGIN_DIR}: info: Downloading official plugin: ${PLUGIN_URL}"
+      wget "${PLUGIN_URL}" -P /tmp
+
+      # Error management
+      exiterr=$?
+      if [ ! ${exiterr} -eq 0 ]; then
+        echo "${ORIGIN_DIR}: error: Error when downloading official plugin ${PLUGIN}: command exited ${exiterr}"
+        exit ${exiterr}
+      fi
+
+      # Extract plugin
+      tar -C "${CERTBOT_DIR_PLUGINS_CERTBOT}" --no-same-owner -zxf "/tmp/${PLUGIN}.tar.gz"
+
+      # Error management
+      exiterr=$?
+      if [ ! ${exiterr} -eq 0 ]; then
+        echo "${ORIGIN_DIR}: error: Error extracting official plugin ${PLUGIN}: command exited ${exiterr}"
+        exit ${exiterr}
+      fi
+
+      # Install plugin
+      if  [[ -f "${PLUGIN_PATH}/setup.py" ]]; then
+        #PLUGIN_NAME="$(python -W ignore ${PLUGIN_PATH}/setup.py --name)"
+        #PLUGIN_VERSION="$(python -W ignore ${PLUGIN_PATH}/setup.py --version)"
+
+        # Install plugin
+        plugin_install "${PLUGIN}" "${PLUGIN_PATH}"
+
+        # Error management
+        exiterr=$?
+        if [ ! ${exiterr} -eq 0 ]; then
+          echo "${ORIGIN_DIR}: error: Error installing official plugin ${PLUGIN}: command exited ${exiterr}"
+          exit ${exiterr}
+        else
+          echo "${ORIGIN_DIR}: info: Successfully installed official plugin: ${PLUGIN}"
+        fi
+      fi
+
+      # clean-up post process
+      echo "${ORIGIN_DIR}: info: Clean-up plugin install files: ${PLUGIN}"
+      rm -f /tmp/${PLUGIN}.tar.gz
+
+    fi
+  done
+
+
+  # Install any plugins in the custom plugins directory
+  for PLUGIN_PATH in ${CERTBOT_DIR_PLUGINS_CUSTOM}/*/; do
+    # If it is a directory only
+    if [[ -d "${PLUGIN_PATH}" ]]; then
+
+      # If plugin contains setup file
+      if  [[ -f "${PLUGIN_PATH}/setup.py" ]]; then
+        IFS='/' read -a PLUGIN_DIR <<< "${PLUGIN_PATH}"
+        PLUGIN="${PLUGIN_DIR[-1]}"
+
+        PLUGIN_NAME="$(python -W ignore ${PLUGIN_PATH}/setup.py --name)"
+
+        # If plugin isn't already installed, install
+        if ! pip list | grep "${PLUGIN_NAME}" >/dev/null; then
+          echo "${ORIGIN_DIR}: info: Installing custom plugin: ${PLUGIN} (${PLUGIN_NAME})"
+
+          # Install plugin
+          plugin_install "${PLUGIN}" "${PLUGIN_PATH}"
+
+          # Error management
+          exiterr=$?
+          if [ ! ${exiterr} -eq 0 ]; then
+            echo "${ORIGIN_DIR}: error: Error installing custom plugin ${PLUGIN} (${PLUGIN_NAME}): command exited ${exiterr}"
+            exit ${exiterr}
+          else
+            echo "${ORIGIN_DIR}: info: Successfully installed custom plugin: ${PLUGIN}"
+          fi
+        else
+          CURRENT_PLUGIN_NAME="$(pip list --format freeze | sed -nE 's/(^.*'${PLUGIN_NAME}'==)(.*)/\2/p')"
+          echo "${ORIGIN_DIR}: warning: Could not install custom plugin ${PLUGIN}, an official plugin is already installed using the same name ${PLUGIN_NAME} (v${CURRENT_PLUGIN_NAME}) ****"
+        fi
+      fi
+    fi
+  done
+
+}
+
+##############################################################################
+#                                 FUNCTIONS                                  #
+##############################################################################
+
+########################## Install Plugin Function ###########################
+
+function plugin_install () {
+  #ARG1 ($1) = Plugin Name
+  #ARG2 ($2) = Plugin Path
+
+  PLUGIN_INSTALL_LOG_FILE="${CERTBOT_DIR_PLUGINS_LOG}/$1_install.log"
+
+  # Debug output
+  if [[ "${CERTBOT_PLUGIN_DEBUG}" == true ]]; then
+    if [[ ! -d "${CERTBOT_DIR_PLUGINS_LOG}" ]]; then
+      echo "${ORIGIN_DIR}: info: Creating logs directory and setting permissions: ${CERTBOT_DIR_PLUGINS_LOG}"
+      mkdir -p ${CERTBOT_DIR_PLUGINS_LOG}
+      chown certbot:certbot ${CERTBOT_DIR_PLUGINS_LOG}
+    fi
+    CERTBOT_PLUGIN_DEBUG="${PLUGIN_INSTALL_LOG_FILE}"
+  else
+    CERTBOT_PLUGIN_DEBUG="/dev/null"
+  fi
+
+  # Install plugin
+  python /opt/certbot/tools/pip_install.py --no-cache-dir --editable "$2" >>"${CERTBOT_PLUGIN_DEBUG}"
+  return $?
+}
+
+##############################################################################
+#                          Pass into main functions                          #
+##############################################################################
+
+main $@

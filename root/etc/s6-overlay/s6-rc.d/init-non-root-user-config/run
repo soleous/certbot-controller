@@ -1,0 +1,62 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+##############################################################################
+#                          init-non-root-user-config                         #
+##############################################################################
+#
+# This program/oneshot service configures the non-root user by changing its
+# uid, gid, and setting folder permissions.
+#
+# Program Documentation: https://github.com/soleous/certbot-controller
+
+##############################################################################
+#                                 VERSIONING                                 #
+##############################################################################
+VERSION="1.1"
+DATE="2026-08-30 12:50 UTC"
+AUTHOR="Soleous (https://github.com/soleous)"
+
+##############################################################################
+#                                    MAINS                                   #
+##############################################################################
+
+main() {
+# script functional variables
+ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
+
+
+# Change UID, GID and set permissions
+if [[ ${PUID} ]] && [[ ${PUID} != $(id -u ${NON_ROOT_USER}) ]]; then
+  # change user UID
+  echo "${ORIGIN_DIR}: info: Modifying UID of user ${NON_ROOT_USER}: ${PUID}"
+  usermod -o -u ${PUID} ${NON_ROOT_USER}
+fi
+
+if [[ ${PGID} ]] && [[ ${PGID} != $(id -g ${NON_ROOT_USER}) ]]; then
+  # change user GID
+  echo "${ORIGIN_DIR}: info: Modifying GID of group ${NON_ROOT_USER}: ${PGID}"
+  groupmod -o -g ${PGID} ${NON_ROOT_USER}
+fi
+
+echo "${ORIGIN_DIR}: info: Changing owner and group of required paths to: ${NON_ROOT_USER}"
+chown -R ${NON_ROOT_USER}:${NON_ROOT_USER} \
+         ${CONTAINER_DIR_CONFIG} \
+         ${CERTBOT_DIR_CONFIG} \
+         ${CONTAINER_DIR_SCRIPTS} \
+         ${CERTBOT_DIR_WORK} \
+         ${CERTBOT_DIR_LOGS}
+}
+
+##############################################################################
+#                                 FUNCTIONS                                  #
+##############################################################################
+
+#################################### None ####################################
+
+
+##############################################################################
+#                          Pass into main functions                          #
+##############################################################################
+
+main $@

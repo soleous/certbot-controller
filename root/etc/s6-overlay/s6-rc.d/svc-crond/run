@@ -1,0 +1,54 @@
+#!/command/with-contenv bash
+# shellcheck shell=bash
+
+##############################################################################
+#                                 svc-crond                                  #
+##############################################################################
+#
+# This longrun service starts crond for cronjobs to be scheduled and executed.
+#
+# Program Documentation: https://github.com/soleous/certbot-controller
+
+##############################################################################
+#                                 VERSIONING                                 #
+##############################################################################
+VERSION="1.1"
+DATE="2026-08-30 12:50 UTC"
+AUTHOR="Soleous (https://github.com/soleous)"
+
+##############################################################################
+#                                    MAINS                                   #
+##############################################################################
+
+main() {
+  # script functional variables
+  ORIGIN_DIR="$(basename ${PWD})"
+
+
+  # Start busybox crond service
+  if [[ $CERTBOT_RENEW_CRON == true ]]; then
+    echo "${ORIGIN_DIR}: info: Starting crond"
+    #if builtin command -v crond >/dev/null 2>&1; then # removed due to output not working
+    #  exec crond -n -s
+    if builtin command -v busybox >/dev/null 2>&1 && [[ $(busybox || true) =~ [[:space:]](crond)([,]|$) ]]; then
+      exec busybox crond -f -S -l 5
+    else
+      exiterr=$?
+      echo "${ORIGIN_DIR}: error: 'crond' not found: exit code ${exiterr}"
+      exit ${exiterr}
+    fi
+  fi
+}
+
+##############################################################################
+#                                 FUNCTIONS                                  #
+##############################################################################
+
+#################################### None ####################################
+
+
+##############################################################################
+#                          Pass into main functions                          #
+##############################################################################
+
+main $@
