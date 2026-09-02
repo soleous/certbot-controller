@@ -126,6 +126,26 @@ hooks:
           password: super-secret-password #optional, default is the file name without extension
 
 ```
+If a hook requires configuration, it can be entered in the above file using yaml. Configuration can link to different yaml blocks, for example scp connections, link to the connections block. If you do not require for example pfx file creation, this section can be deleted from your yaml file.
+
+Certificate names are defined by certbot and executing the command `certificates` will display all current certificates and there state.
+
+### Testing Renewal-hook Outside of the Renewal Process
+If a script errors or fails while renewing, they can be debugged, tested or rerun outside of the renewal process by directly executing the script. For example from cli:
+
+> [!NOTE]
+> * All uninstalled scripts are stored under: `/scripts/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`
+> * All installed scripts are stored under: `/etc/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`
+```bash
+docker exec -it certbot-controller /scripts/letsencrypt/renewal-hooks/deploy/<script>.sh --cert-name subdomain.domain.tld
+```
+
+Alternatively, shell into the container using bash `docker exec -it certbot-controller /bin/bash` and execute the scripts located in the scripts folder.
+
+Lastly, current version of the scripts are displayed using `--version`.
+
+> [!IMPORTANT]
+> Shelling into the docker container using this method will be ran as `root`, so if permissions are incorrect, it will be a false positive. It is also not recommended to create/renew certificates using this method, because it can break permissions on certificate files.
 
 ### Creating SSH Keys
 If the renewal-hook script requires ssh keys, the following is a brief description on how to create them:
@@ -140,7 +160,8 @@ cat config/.ssh/username-remotename.pub
 mkdir ~/.ssh
 vi ~/.ssh/authorized_keys
 ```
-*Note: The ssh keys should be added to the correct user on the remote server.*
+> [!TIP]
+> The ssh keys should be added to the correct user on the remote server.
 
 #### Validate the ssh keys
 the following should connect successfully without requiring a password.
@@ -166,7 +187,8 @@ To configure correct permissions on the remote host, there are several options, 
 * Shared access between applications and containers via groups and make the user a member
 * Set permissions at a minimal, file permissions are not changed on the remote server when transferring files
 
-***Note: Use at your own risk, the biggest recommendation is to understand your architecture and assess the risks of your configuration.  We take no liability.***
+> [!CAUTION]
+> Use at your own risk, the biggest recommendation is to understand your architecture and assess the risks of your configuration.  We take no liability.
 
 
 ### Renewal-hook: PFX
@@ -175,6 +197,17 @@ PFX files are created, for specific domains only. The default password is weak, 
 PFX file permissions are by default 'read/write' for users and groups, others have none.
 
 # Examples
+
+## Docker Images
+Currently there are no official Docker images as the CI/CD is in development.  To build an image for testing, use the following docker build command.
+
+```bash
+docker buildx build \
+  --tag certbot-controller:v5.7.0-1 \
+  --label certbot-controller_build=1 \
+  --build-arg CERTBOT_IMAGE_TAG="v5.7.0"
+```
+
 
 ## Creating a Certificate
 If you don't already have certificates, the main method is currently to use a certbot command.  For example:
@@ -226,7 +259,8 @@ services:
         --keep-until-expiring
         -d subdomain.domain.tld
 ```
-***Note: When using docker compose to create certificates, I would recommend using a separate compose file for the renewals, removing the command, once executed or executing docker compose with `rm` to remove stopped services.***
+> [!TIP]
+> When using docker compose to create certificates, I would recommend using a separate compose file for the renewals, removing the command, once executed or executing docker compose with `rm` to remove stopped services.***
 
 ## Renewal Scheduling
 Enable cron scheduling with certbot defaults and a single plugin `certbot_dns_cloudflare`.
