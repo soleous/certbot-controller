@@ -59,7 +59,7 @@ When multiple certificates of the same name are created certbot will add a ‘-0
 | CERTBOT_RENEW_SYNTAX | none | `--deploy /config/hook.sh` | Extra syntax, for when 'certbot renew' is executed. |
 | CERTBOT_RENEW_CRON | false | true | Enables cron scheduling and the container will not exit after execution. |
 | CERTBOT_RENEW_CRON_SCHEDULE | `0 */12 * * *` (every 12th hour) | `*/5 * * * *` | Set [crontab](https://man7.org/linux/man-pages/man5/crontab.5.html) schedule to a custom value. |
-| CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 3600 | A sleep period is added to the cronjob and randomizes the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0, however this isn't recommended. |
+| CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 3600 | A sleep period (in seconds) is added to the cronjob and randomizes the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0, however this isn't recommended. |
 
 ## Certbot Official Plugins
 Official plugins are installed by download from certbot's github repository.  Default plugin names can be found in certbot's github using there directory or release name (kebab-case "-" or "_" are both accepted). For Example cloudflare's name is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare" or "certbot_dns_cloudflare".  All default plugins much be available as an asset in there releases.
@@ -261,7 +261,7 @@ services:
         -d subdomain.domain.tld
 ```
 > [!TIP]
-> When using docker compose to create certificates, I would recommend using a separate compose file for the renewals, removing the command, once executed or executing docker compose with `rm` to remove stopped services.***
+> When using docker compose to create certificates, I would recommend using a separate compose file for the renewals, removing the command, once executed or executing docker compose with `rm` to remove stopped services.
 
 ## Renewal Scheduling
 Enable cron scheduling with certbot defaults and a single plugin `certbot_dns_cloudflare`.
