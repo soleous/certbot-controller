@@ -62,31 +62,31 @@ When multiple certificates of the same name are created certbot will add a ‘-0
 | CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 3600 | A sleep period (in seconds) is added to the cronjob and randomizes the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0, however this isn't recommended. |
 
 ## Certbot Official Plugins
-Official plugins are installed by download from certbot's github repository.  Default plugin names can be found in certbot's github using there directory or release name (kebab-case "-" or "_" are both accepted). For Example cloudflare's name is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare" or "certbot_dns_cloudflare".  All default plugins much be available as an asset in there releases.
+Official plugins are installed by download from certbot's github repository.  Default plugin names can be found in certbot's github using their directory or release name (kebab-case "-" or "_" are both accepted). For Example cloudflare's name is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare" or "certbot_dns_cloudflare".  All default plugins must be available as an asset in their releases.
 
-For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to true.
+For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to 'true'.
 
 ## Custom Plugins
-Custom plugins can be installed by placing them, uncompressed, in a folder within '/config/plugins/' for example '/config/plugins/name-of-plugin/'. There must have a 'setup.py' file within this directory, for them to install correctly.  
+Custom plugins can be installed by placing them, uncompressed, in a folder within '/config/plugins/' for example '/config/plugins/name-of-plugin/'. There must be a 'setup.py' file within this directory, for them to install correctly.  
 
-For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to true.
+For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to 'true'.
 
 ## Certbot-Controller Renew Options
-Renewal's can operate as the stock docker image by command using "renew" after certificates have been created. However certbot-controller adds environmental variable **'CERTBOT_RENEW_RUNONSTART'** that will run renewal when the container starts. When finished it will exit, unless **'CERTBOT_RENEW_CRON'** is true, which will enable the cron services using certbot recommended configuration.  The **'CERTBOT_RENEW_SYNTAX'** variable adds additional syntax for the renewal command, for example `--deploy /config/hook.sh`.
+Renewal's can operate as the stock docker image by command using "renew" after certificates have been created. However certbot-controller adds environmental variable **'CERTBOT_RENEW_RUNONSTART'** that will run renewal when the container starts. When finished it will exit, unless **'CERTBOT_RENEW_CRON'** is 'true', which will enable the cron services using certbot recommended configuration.  The **'CERTBOT_RENEW_SYNTAX'** variable adds additional syntax for the renewal command, for example `--deploy /config/hook.sh`.
 
 ## Certbot-Controller Cronjob Options
-Certbot-Controller's default and certbot's recommended cron schedule is `0 */12 * * *` with a random sleep between 0 and 43,199 functionally a 24 hour period. Cronjob customization are defined using **'CERTBOT_RENEW_CRON_SCHEDULE'** and **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'**. For scheduling [crontab guru](https://crontab.guru/) is a good resource.  Sleep periods are always between 0 and a maximum, hence a max sleeptime variable. This randomness prevent throttling 'Let's Encrypt' servers on the 12th hours.  It can however be disabled when set to 0.
+Certbot-Controller's default and certbot's recommended cron schedule is `0 */12 * * *` with a random sleep between 0 and 43,199 functionally a 24 hour period. Cronjob customization are defined using **'CERTBOT_RENEW_CRON_SCHEDULE'** and **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'**. For scheduling [crontab guru](https://crontab.guru/) is a good resource.  Sleep periods are always between 0 and a maximum, hence a max sleeptime variable. This randomness prevents throttling 'Let's Encrypt' servers on the 12th hour.  It can however be disabled when set to 0.
 
 ## Certbot-Controller  Renewal Hooks
 Renewal Hooks are scripts that execute on renewal of a certificate.  They automate common tasks such as creating PFX files or deploying the certificates. For more information on hooks see the following [certbot documentation](https://eff-certbot.readthedocs.io/en/stable/using.html#renewing-certificates).
 
-Packaged with certbot-controller are the following hooks, however they are not installed by default, they are enabled by setting **'HOOK_INSTALL'** to true.
+Packaged with certbot-controller are the following hooks, however they are not installed by default, they are enabled by setting **'HOOK_INSTALL'** to 'true'.
 
 * Deploy certificate files via SCP to remote servers
 * Create PFX certificate files
 
 ### Configuration
-All hooks configuration are located in `\config\certbot-controller.yaml`.
+All hook configurations are located in `\config\certbot-controller.yaml`.
 
 ```YAML
 hooks:
@@ -128,7 +128,7 @@ hooks:
 ```
 If a hook requires configuration, it can be entered in the above file using yaml. Configuration can link to different yaml blocks, for example scp connections, link to the connections block. If you do not require for example pfx file creation, this section can be deleted from your yaml file.
 
-Certificate names are defined by certbot and executing the command `certificates` will display all current certificates and there state.
+Certificate names are defined by certbot and executing the command `certificates` will display all current certificates and their state.
 
 ### Testing Renewal-hook Outside of the Renewal Process
 If a script errors or fails while renewing, they can be debugged, tested or rerun outside of the renewal process by directly executing the script. For example from cli:
@@ -139,14 +139,14 @@ docker exec -it certbot-controller /scripts/letsencrypt/renewal-hooks/deploy/<sc
 
 Alternatively, shell into the container using bash `docker exec -it certbot-controller /bin/bash` and execute the scripts located in the scripts folder.
 
-Lastly, current version of the scripts are displayed using `--version`.
+Lastly, current versions of the scripts are displayed using `--version`.
 
 > [!NOTE]
 > * All uninstalled scripts are stored under: `/scripts/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`
 > * All installed scripts are stored under: `/etc/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`
 
 > [!IMPORTANT]
-> Shelling into the docker container using this method will be ran as `root`, so if permissions are incorrect, it will be a false positive. It is also not recommended to create/renew certificates using this method, because it can break permissions on certificate files.
+> Shelling into the docker container using this method will be run as `root`, so if permissions are incorrect, it will be a false positive. It is also not recommended to create/renew certificates using this method, because it can break permissions on certificate files.
 
 ### Creating SSH Keys
 If the renewal-hook script requires ssh keys, the following is a brief description on how to create them:
@@ -176,7 +176,7 @@ Log outputs are verbose, therefore executing `certbot logs container-name` will 
 # ID Mapping, Security and Certificate Deployment
 Certbot is executed using user and group IDs (default 911), they can be customized using variable **'PUID'** and **'PGID'**. All files within `/config`, `/etc/letsencrypt` and `var/log/letsencrypt` will therefore use the same IDs.
 
-Certbot certificate file permissions can be show by executing `ls -l etc/letsencrypt/archive/subdomain.domain.tld/` and by default owner has 'read/write' for private keys and public keys. Groups and others get 'read' only for public keys. When deploying these certificates manually permissions may need to be changed to allow other applications to read them.
+Certbot certificate file permissions can be shown by executing `ls -l etc/letsencrypt/archive/subdomain.domain.tld/` and by default the owner has 'read/write' for private keys and public keys. Groups and others get 'read' only for public keys. When deploying these certificates manually permissions may need to be changed to allow other applications to read them.
 
 ### Renewal-hook: SCP
 
@@ -193,7 +193,7 @@ To configure correct permissions on the remote host, there are several options, 
 
 
 ### Renewal-hook: PFX
-PFX files are created, for specific domains only. The default password is weak, as its documented here, being the file name without suffix, its recommended to set a password.
+PFX files are created for specific domains only. The default password is weak, as it's documented here, being the file name without suffix, it's recommended to set a password.
 
 PFX file permissions are by default 'read/write' for users and groups, others have none.
 
@@ -261,7 +261,7 @@ services:
         -d subdomain.domain.tld
 ```
 > [!TIP]
-> When using docker compose to create certificates, I would recommend using a separate compose file for the renewals, removing the command, once executed or executing docker compose with `rm` to remove stopped services.
+> When using docker compose to create certificates, I would recommend using a separate compose file for the renewals, removing the command (once executed) or executing docker compose with `rm` to remove stopped services.
 
 ## Renewal Scheduling
 Enable cron scheduling with certbot defaults and a single plugin `certbot_dns_cloudflare`.
