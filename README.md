@@ -25,10 +25,12 @@ Certbot-controller is built on top of [certbot](https://github.com/certbot/certb
 * Improved verbose log output and cron schedule output
 
 ## Certbot-controller: future development
-The core functionality is complete and added quality of life improvements will be added over time.  This includes:
+The core functionality is complete and added quality of life improvements will be done over time.  This includes:
 
 * Docker image deployment (in progress)
 * CI/CD implementation for rolling updates from certbot (in progress)
+* Add methods to automate ssh key creation
+* Renewal-hook script to change permissions, owners and groups
 * Add functionality into certbot-controller.yaml to:
   * Create Certificates
   * Add setting currently as defined as environmental variables
@@ -51,7 +53,7 @@ When multiple certificates of the same name are created certbot will add a ‘-0
 | --- | --- | --- | --- |
 | PUID | 911 | 1000 | Sets the numeric user ID that certbot will run as within the container. This will map the host storage permissions to the guest container. |
 | PGID | 911 | 1000 | Sets the numeric group ID that certbot will run as within the container. This will map the host storage permissions to the guest container. |
-| CERTBOT_PLUGINS | none | certbot_dns_cloudflare | Installs official certbot plugins from certbot's github repository. |
+| CERTBOT_PLUGINS | none | `certbot_dns_cloudflare` | Installs official certbot plugins from certbot's github repository. |
 | HOOK_INSTALL | false | true | Installs renew-hooks packaged with certbot-controller. |
 | CERTBOT_RENEW_RUNONSTART | false | true | Runs renewal when the container starts. |
 | CERTBOT_RENEW_SYNTAX | none | `--deploy /config/hook.sh` | Extra syntax, for when 'certbot renew' is executed. |
@@ -92,11 +94,11 @@ hooks:
     - name: webserver # link from connection names for example scp.connection
       host: ip address # hostnames or ip address
       remote-user: username
-      ssh-keyfile: username-webserver # Default location /config/.ssh
+      ssh-keyfile: ssh-key-file-name # ssh keys for ssh/scp with default location /config/.ssh
     - name: waf  # Names link to connection names for example scp.connection
       host: hostname # hostnames or ip address
       remote-user: username
-      ssh-keyfile: /config/.ssh/username-hostname # direct paths
+      ssh-keyfile: /config/.ssh/ssh-key-file-name # ssh keys for ssh/scp with direct paths
       timeout: 5 # Optional timeout, default 15 seconds
   deploy:
     scp: # this section has configuration to scp files to remote connections
@@ -125,17 +127,60 @@ hooks:
 
 ```
 
+### Creating SSH Keys
+If the renewal-hook script requires ssh keys, the following is a brief description on how to create them:
+
+#### Executed on client/certbot-controller Linux host
+```bash
+ssh-keygen -t rsa -C "username@certbot-controller" -f config/.ssh/username-remotename
+cat config/.ssh/username-remotename.pub
+```
+#### Add the public key to the remote server for example in Linux
+```bash
+mkdir ~/.ssh
+vi ~/.ssh/authorized_keys
+```
+*Note: The ssh keys should be added to the correct user on the remote server.*
+
+#### Validate the ssh keys
+the following should connect successfully without requiring a password.
+```bash
+ssh -i config/.ssh/username-remotename username@server
+```
+
 ## Certbot-Controller Logging
-Log outputs are verbose, therefore executing `certbot container-name logs` will display container history and current certificate renewals, including schedule of the next run.
+Log outputs are verbose, therefore executing `certbot logs container-name` will display container history and current certificate renewals, including schedule of the next run.
+
+# ID Mapping, Security and Certificate Deployment
+Certbot is executed using user and group IDs (default 911), they can be customized using variable **'PUID'** and **'PGID'**. All files within `/config`, `/etc/letsencrypt` and `var/log/letsencrypt` will therefore use the same IDs.
+
+Certbot certificate file permissions can be show by executing `ls -l etc/letsencrypt/archive/subdomain.domain.tld/` and by default owner has 'read/write' for private keys and public keys. Groups and others get 'read' only for public keys. When deploying these certificates manually permissions may need to be changed to allow other applications to read them.
+
+### Renewal-hook: SCP
+
+When using the SCP renewal-hook, files are transferred using the **remote user** and therefore **permissions** on the **remote host**.  If this **remote user** does not have correct permissions to the file, expect a `Permission denied`.
+
+To configure correct permissions on the remote host, there are several options, however, for security reasons, the following is recommended:
+* Do not use a high privileged user for example root or critical services owner
+* Create a user specifically for certificate management/transfer and only give it permissions to files its transferring
+* Shared access between applications and containers via groups and make the user a member
+* Set permissions at a minimal, file permissions are not changed on the remote server when transferring files
+
+***Note: Use at your own risk, the biggest recommendation is to understand your architecture and assess the risks of your configuration.  We take no liability.***
+
+
+### Renewal-hook: PFX
+PFX files are created, for specific domains only. The default password is weak, as its documented here, being the file name without suffix, its recommended to set a password.
+
+PFX file permissions are by default 'read/write' for users and groups, others have none.
 
 # Examples
 
 ## Creating a Certificate
-Certificates are currently created using certbot command method.  For example:
+If you don't already have certificates, the main method is currently to use a certbot command.  For example:
 #### docker cli:
 ```bash
-docker run -it \
-  --rm \
+docker run -it --rm \
   --name certbot-controller-run \
   -e PGID=1000 \
   -e PUID=1000 \
@@ -181,9 +226,9 @@ services:
         --keep-until-expiring
         -d subdomain.domain.tld
 ```
-***Note: When using docker compose to create certificates, I would recommend using a separate compose file for the renewals or removing the command, once executed.***
+***Note: When using docker compose to create certificates, I would recommend using a separate compose file for the renewals, removing the command, once executed or executing docker compose with `rm` to remove stopped services.***
 
-## Cron Scheduling
+## Renewal Scheduling
 Enable cron scheduling with certbot defaults and a single plugin `certbot_dns_cloudflare`.
 
 #### docker cli
