@@ -54,6 +54,7 @@ When multiple certificates of the same name are created certbot will add a ‘-0
 | PUID | 911 | 1000 | Sets the numeric user ID that certbot will run as within the container. This will map the host storage permissions to the guest container. |
 | PGID | 911 | 1000 | Sets the numeric group ID that certbot will run as within the container. This will map the host storage permissions to the guest container. |
 | CERTBOT_PLUGINS | none | `certbot_dns_cloudflare` | Installs official certbot plugins from certbot's github repository. |
+| CERTBOT_PLUGIN_DEBUG | false | true | Output 'plugin install' debugs logs to `/config/logs/plugin-install` |
 | HOOK_INSTALL | false | true | Installs renew-hooks packaged with certbot-controller. |
 | CERTBOT_RENEW_RUNONSTART | false | true | Runs renewal when the container starts. |
 | CERTBOT_RENEW_SYNTAX | none | `--deploy /config/hook.sh` | Extra syntax, for when 'certbot renew' is executed. |
