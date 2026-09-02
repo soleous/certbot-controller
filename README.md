@@ -133,9 +133,6 @@ Certificate names are defined by certbot and executing the command `certificates
 ### Testing Renewal-hook Outside of the Renewal Process
 If a script errors or fails while renewing, they can be debugged, tested or rerun outside of the renewal process by directly executing the script. For example from cli:
 
-> [!NOTE]
-> * All uninstalled scripts are stored under: `/scripts/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`
-> * All installed scripts are stored under: `/etc/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`
 ```bash
 docker exec -it certbot-controller /scripts/letsencrypt/renewal-hooks/deploy/<script>.sh --cert-name subdomain.domain.tld
 ```
@@ -143,6 +140,10 @@ docker exec -it certbot-controller /scripts/letsencrypt/renewal-hooks/deploy/<sc
 Alternatively, shell into the container using bash `docker exec -it certbot-controller /bin/bash` and execute the scripts located in the scripts folder.
 
 Lastly, current version of the scripts are displayed using `--version`.
+
+> [!NOTE]
+> * All uninstalled scripts are stored under: `/scripts/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`
+> * All installed scripts are stored under: `/etc/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`
 
 > [!IMPORTANT]
 > Shelling into the docker container using this method will be ran as `root`, so if permissions are incorrect, it will be a false positive. It is also not recommended to create/renew certificates using this method, because it can break permissions on certificate files.
