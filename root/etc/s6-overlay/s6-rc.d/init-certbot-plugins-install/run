@@ -40,7 +40,7 @@ main() {
 
   # script default variables: additions and changes
   CERTBOT_VERSION="$(certbot --version | sed -nE 's/(^.*certbot )(.*)/\2/p')"
-  CERTBOT_DIR_PLUGINS_LOG="${CERTBOT_DIR_PATH}/logs/plugin-install" # no leading /
+  CERTBOT_DIR_PLUGINS_LOG="${CONTAINER_DIR_CONFIG}/logs/plugin-install" # no leading /
   CERTBOT_DIR_PLUGINS_CERTBOT="/opt/certbot/src/plugins" # no leading /
   CERTBOT_DIR_PLUGINS_CUSTOM="${CERTBOT_DIR_PLUGINS}" # no leading /
 

@@ -64,12 +64,12 @@ When multiple certificates of the same name are created certbot will add a ‘-0
 ## Certbot Official Plugins
 Official plugins are installed by download from certbot's github repository.  Default plugin names can be found in certbot's github using their directory or release name (kebab-case "-" or "_" are both accepted). For Example cloudflare's name is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare" or "certbot_dns_cloudflare".  All default plugins must be available as an asset in their releases.
 
-For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to 'true'.
+For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to 'true' and debug logs will be stored in `/config/logs/plugin-install`.
 
 ## Custom Plugins
 Custom plugins can be installed by placing them, uncompressed, in a folder within '/config/plugins/' for example '/config/plugins/name-of-plugin/'. There must be a 'setup.py' file within this directory, for them to install correctly.  
 
-For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to 'true'.
+For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to 'true' and debug logs will be stored in `/config/logs/plugin-install`.
 
 ## Certbot-Controller Renew Options
 Renewal's can operate as the stock docker image by command using "renew" after certificates have been created. However certbot-controller adds environmental variable **'CERTBOT_RENEW_RUNONSTART'** that will run renewal when the container starts. When finished it will exit, unless **'CERTBOT_RENEW_CRON'** is 'true', which will enable the cron services using certbot recommended configuration.  The **'CERTBOT_RENEW_SYNTAX'** variable adds additional syntax for the renewal command, for example `--deploy /config/hook.sh`.
