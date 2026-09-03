@@ -311,15 +311,15 @@ services:
 ```
 
 ## Fully Stack Docker Compose/Template
-The following example is a complete template including all options "remarked out".
+The following example is a complete template including all environment variables and create certificate command "remarked out".
 ```yaml
 services:
   certbot-controller:
     image: certbot-controller:v5.7.0-1
     container_name: certbot-controller
-    environment:
-      PUID: 1000
-      PGID: 1000
+    #environment:
+      #PUID: 1000
+      #PGID: 1000
       #CERTBOT_PLUGINS: >-
       #  certbot_dns_cloudflare
       #  certbot-dns-route53
