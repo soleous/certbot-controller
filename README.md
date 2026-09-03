@@ -1,46 +1,47 @@
 # certbot-controller (beta)
 ## What is certbot?
-In short, [certbot](https://github.com/certbot/certbot) is a tool that automates the process of acquiring and renewing SSL/TLS certificates from the CA/Third Party [Let's Encrypt](https://letsencrypt.org/). Not to put works in certbot's mouth, so to quote:
+In summary, [certbot](https://github.com/certbot/certbot) is a tool that automates the process of acquiring and renewing SSL/TLS certificates from the CA/Third Party [Let's Encrypt](https://letsencrypt.org/). Not to put works in certbot's mouth, so to quote:
 
 [certbot](https://github.com/certbot/certbot), _"Certbot is part of EFF’s effort to encrypt the entire Internet. Secure communication over the Web relies on HTTPS, which requires the use of a digital certificate that lets browsers verify the identity of web servers (e.g., is that really google.com?). Web servers obtain their certificates from trusted third parties called certificate authorities (CAs). Certbot is an easy-to-use client that fetches a certificate from Let’s Encrypt—an open certificate authority launched by the EFF, Mozilla, and others—and deploys it to a web server._
 
 _Anyone who has gone through the trouble of setting up a secure website knows what a hassle getting and maintaining a certificate is. Certbot and Let’s Encrypt can automate away the pain and let you turn on and manage HTTPS with simple commands. Using Certbot and Let's Encrypt is free."_
 
 ## What does certbot-controller do?
-Certbot-controller is built on top of [certbot](https://github.com/certbot/certbot) docker image and provides additional functionality to enhance the certbot docker experience, including:
+Certbot-controller is built on top of the '[certbot](https://github.com/certbot/certbot) docker image' and provides additional functionality to enhance the certbot docker experience, including:
 
-* Certbot execution using non-root user
-* Customize ID mapping to the containers internal user
+* Designed as "over the top service" for certbot’s existing docker image and therefore workflows
+* By default, certbot executes as a non-root user
+* Customize non-root user/group IDs for the containers internal user
 * Added or updated tools such as bash, openssl, openssh, etc.
-* Optional plugin install using the official certbot plugins
-* Optional custom plugin install
-* The ability to install more than one plugin for a single docker instance
-* Optional “always up” with certbot's recommended cron configuration for renewals
-* Optional custom cronjob scheduling for certbot renewal
-* Optional custom cronjob sleep random maximum for certbot renewal
-* Optional custom renewal syntax
-* Optional run on start
-* Optional deployment hook to transfer certificates to remote servers, using SCP
-* Optional deployment hook to create pfx files
-* Improved verbose log output and cron schedule output
+* Optional:
+  * Install official certbot plugins, sourced from certbot
+  * Install custom plugins from other sources
+  * Scheduled certificate renewal using certbot's recommended configuration
+  * Customize certbot's renewal schedule (including random sleep periods)
+  * Certificate renewal on container start
+  * Renew automation (renewal-hooks) to:
+    * Transfer certificates to remote servers, using SCP
+    * Create pfx files
+* Install more than one plugin on a single docker instance
+* Improved verbose log output and next schedule output
 
 ## Certbot-controller: future development
-The core functionality is complete and added quality of life improvements will be done over time.  This includes:
+The core functionality is complete and added quality of life improvements will be done over time.  This may includes:
 
 * Docker image deployment (in progress)
 * CI/CD implementation for rolling updates from certbot (in progress)
+* Improve certificate creation workflows
 * Add methods to automate ssh key creation
-* Renewal-hook script to change permissions, owners and groups
-* Add functionality into certbot-controller.yaml to:
-  * Create Certificates
-  * Add setting currently as defined as environmental variables
+* Renew automation (renewal-hook) to change permissions, owners and groups
+* Renew automation (renewal-hook) for local transfer
+* Expose configuration outside of environmental variables
 * Email notifications for conditions such as expiration warnings, renewals and failures
 * Triggers for external services
-* Docker integration for routine management
+* Docker integration for renew automation (renewal-hook)
 * Web UI for certificate management and monitoring
 
 # Usage
-Certbot-controller intentionally operates as close to certbot’s docker image as possible, however it includes required operations, such as non-root, ID mapping and plugin install. To run as “always up” using cron scheduling or include renewal-hooks, they need enabling.
+Certbot-controller is designed to operate as close to certbot’s docker image as possible, however non-root configuration and extra tools are an operational requirement. The majority of features are optional, including, “always up” cron scheduling, packaged renewal-hooks, plugin installs, etc. By design this should swap into existing workflows, with the exception of running as root.
 
 ### Unsolicited Advice
 If this is the first time using certbot, I would recommend creating a certificate in Let's Encrypt's staging environment first, by adding ‘--staging’ to the command syntax.  Certbot's public services will throttle duplicate certificates of the same name, limited to 5 certificates over a 7 day period. 
@@ -78,7 +79,7 @@ Renewal's can operate as the stock docker image by command using "renew" after c
 ## Certbot-Controller Cronjob Options
 Certbot-Controller's default and certbot's recommended cron schedule is `0 */12 * * *` with a random sleep between 0 and 43,199 functionally a 24 hour period. Cronjob customization are defined using **'CERTBOT_RENEW_CRON_SCHEDULE'** and **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'**. For scheduling [crontab guru](https://crontab.guru/) is a good resource.  Sleep periods are always between 0 and a maximum, hence a max sleeptime variable. This randomness prevents throttling 'Let's Encrypt' servers on the 12th hour.  It can however be disabled when set to 0.
 
-## Certbot-Controller  Renewal Hooks
+## Certbot-Controller Renewal Hooks
 Renewal Hooks are scripts that execute on renewal of a certificate.  They automate common tasks such as creating PFX files or deploying the certificates. For more information on hooks see the following [certbot documentation](https://eff-certbot.readthedocs.io/en/stable/using.html#renewing-certificates).
 
 Packaged with certbot-controller are the following hooks, however they are not installed by default, they are enabled by setting **'HOOK_INSTALL'** to 'true'.
@@ -175,7 +176,7 @@ ssh -i config/.ssh/username-remotename username@server
 Log outputs are verbose, therefore executing `certbot logs container-name` will display container history and current certificate renewals, including schedule of the next run.
 
 # ID Mapping, Security and Certificate Deployment
-Certbot is executed using user and group IDs (default 911), they can be customized using variable **'PUID'** and **'PGID'**. All files within `/config`, `/etc/letsencrypt` and `var/log/letsencrypt` will therefore use the same IDs.
+Within certbot-controller, certbot is executed using user and group IDs (default 911), they can be customized using variable **'PUID'** and **'PGID'**. All files within `/config`, `/etc/letsencrypt` and `var/log/letsencrypt` will therefore use the same IDs.
 
 Certbot certificate file permissions can be shown by executing `ls -l etc/letsencrypt/archive/subdomain.domain.tld/` and by default the owner has 'read/write' for private keys and public keys. Groups and others get 'read' only for public keys. When deploying these certificates manually permissions may need to be changed to allow other applications to read them.
 
