@@ -318,32 +318,31 @@ services:
     image: certbot-controller:v5.7.0-1
     container_name: certbot-controller
     environment:
-      #PUID: 1000
-      #PGID: 1000
+      PUID: 1000
+      PGID: 1000
       #CERTBOT_PLUGINS: >-
       #  certbot_dns_cloudflare
       #  certbot-dns-route53
-      #CERTBOT_PLUGIN_DEBUG: true
+      #CERTBOT_PLUGIN_DEBUG: true #plugin install debug logs: /config/logs/
       #CERTBOT_RENEW_SYNTAX: '--deploy-hook /path/to/renewal-hooks/filename.sh'
-      #CERTBOT_RENEW_RUNONSTART: true
+      #CERTBOT_RENEW_RUNONSTART: true #enable run on container start
       #CERTBOT_RENEW_CRON: true #enable cron
-      #CERTBOT_RENEW_CRON_SCHEDULE: '*/5 * * * *' #every 5 minutes
-      #CERTBOT_RENEW_CRON_MAX_SLEEPTIME: 0 #disable (not recommended), in seconds, 21600 is 6 hours
-      #CERTBOT_RENEW_CRON_SCHEDULE: '0 */3 * * *' #every 3 hours
-      #CERTBOT_RENEW_CRON_MAX_SLEEPTIME: '(( 3 * 60 * 60 ) -1)' #every 3 hours
-      HOOK_INSTALL: true #enables the hook deployments/installs
+      #CERTBOT_RENEW_CRON_SCHEDULE: '0 4 * * *' #schedule at 4am
+      #CERTBOT_RENEW_CRON_MAX_SLEEPTIME: 21600 #6 hours in seconds, disable using 0 (not recommended) 
+      #HOOK_INSTALL: true #enables the hook deployments/installs
     volumes:
       - ./config:/config
       - ./etc/letsencrypt:/etc/letsencrypt
       - ./var/log/letsencrypt:/var/log/letsencrypt
-    command: >-
-      certonly --dns-cloudflare
-        --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini
-        --dns-cloudflare-propagation-seconds 30
-        --email admin@domain.tld
-        --agree-tos
-        --no-eff-email
-        --rsa-key-size 4096
-        --keep-until-expiring
-        -d subdomain.domain.tld
+    #command: >-
+    #  certonly --dns-cloudflare
+    #    --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini
+    #    --dns-cloudflare-propagation-seconds 30
+    #    --email admin@domain.tld
+    #    --agree-tos
+    #    --no-eff-email
+    #    --rsa-key-size 4096
+    #    --keep-until-expiring
+    #    -d subdomain.domain.tld
+    #    --cert-name subdomain.domain.tld
 ```
