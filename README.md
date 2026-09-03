@@ -60,8 +60,8 @@ When multiple certificates of the same name are created certbot will add a ‘-0
 | CERTBOT_RENEW_RUNONSTART | false | true | Runs renewal when the container starts. |
 | CERTBOT_RENEW_SYNTAX | none | `--deploy /config/hook.sh` | Extra syntax, for when 'certbot renew' is executed. |
 | CERTBOT_RENEW_CRON | false | true | Enables cron scheduling and the container will not exit after execution. |
-| CERTBOT_RENEW_CRON_SCHEDULE | `0 */12 * * *` (every 12th hour) | `*/5 * * * *` | Set [crontab](https://man7.org/linux/man-pages/man5/crontab.5.html) schedule to a custom value. |
-| CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 3600 | A sleep period (in seconds) is added to the cronjob and randomizes the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0, however this isn't recommended. |
+| CERTBOT_RENEW_CRON_SCHEDULE | `0 */12 * * *` (every 12th hour) | `0 0 * * *` | Set [crontab](https://man7.org/linux/man-pages/man5/crontab.5.html) schedule to a custom value. **Not recommended** |
+| CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 86400 | A sleep period (in seconds) is added to the cronjob and randomizes the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0. **Not recommended** |
 
 ## Certbot Official Plugins
 Official plugins are installed by download from certbot's github repository.  Default plugin names can be found in certbot's github using their directory or release name (kebab-case "-" or "_" are both accepted). For Example cloudflare's name is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare" or "certbot_dns_cloudflare".  All default plugins must be available as an asset in their releases.
@@ -76,8 +76,17 @@ For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to '
 ## Certbot-Controller Renew Options
 Renewal's can operate as the stock docker image by command using "renew" after certificates have been created. However certbot-controller adds environmental variable **'CERTBOT_RENEW_RUNONSTART'** that will run renewal when the container starts. When finished it will exit, unless **'CERTBOT_RENEW_CRON'** is 'true', which will enable the cron services using certbot recommended configuration.  The **'CERTBOT_RENEW_SYNTAX'** variable adds additional syntax for the renewal command, for example `--deploy /config/hook.sh`.
 
-## Certbot-Controller Cronjob Options
-Certbot-Controller's default and certbot's recommended cron schedule is `0 */12 * * *` with a random sleep between 0 and 43,199 functionally a 24 hour period. Cronjob customization are defined using **'CERTBOT_RENEW_CRON_SCHEDULE'** and **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'**. For scheduling [crontab guru](https://crontab.guru/) is a good resource.  Sleep periods are always between 0 and a maximum, hence a max sleeptime variable. This randomness prevents throttling 'Let's Encrypt' servers on the 12th hour.  It can however be disabled when set to 0.
+## Certbot-Controller Renew Schedule/Cron
+Certbot-Controller's default and certbot's recommended cron schedule is `0 */12 * * *` (the 12th hour) with a random sleep between 0 and 43,199 (12 Hours), functionally executing randomly in a 12 hour period. 
+
+Although **not recommended** (see below tip), Cronjob customization are defined using **'CERTBOT_RENEW_CRON_SCHEDULE'** and **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'**. For scheduling [crontab guru](https://crontab.guru/) is a good resource.  Sleep periods are always between 0 and a maximum, hence a max sleeptime variable. This randomness prevents throttling 'Let's Encrypt' servers on an exact schedule.  It can however be disabled when set to 0.
+
+> [!TIP]
+> Sleep periods should coincide within the schedule period. As cron executes at the scheduled time, the renew process will wait (sleep) to execute. If your sleep is past the next scheduled run, you will get odd results within your schedule. For example, if you schedule every 5 minutes and sleep for 12 hours, renew will not execute every 5 minutes, but create a run job every 5 minutes and they will all execute randomly over a 12 hour period.  Settings like this can throttle the Let's Encrypt servers and block you from renewing certificates, hency why its **not recommended**, it's not just to prevent throttling on scheduled times.
+>
+> However, if you wise to execute, for example, at 4am with an random sleep of 1 hour, creating a more routine maintenance windows.  This can be done using a schedule of `0 4 * * *` and sleep `3600`.
+>
+> Use at your own risk and please respect Let's Encrypt servers.
 
 ## Certbot-Controller Renewal Hooks
 Renewal Hooks are scripts that execute on renewal of a certificate.  They automate common tasks such as creating PFX files or deploying the certificates. For more information on hooks see the following [certbot documentation](https://eff-certbot.readthedocs.io/en/stable/using.html#renewing-certificates).
@@ -301,3 +310,40 @@ services:
       - ./var/log/letsencrypt:/var/log/letsencrypt
 ```
 
+## Fully Stack Docker Compose/Template
+The following example is a complete template including all options "remarked out".
+```yaml
+services:
+  certbot-controller:
+    image: certbot-controller:v5.7.0-1
+    container_name: certbot-controller
+    environment:
+      #PUID: 1000
+      #PGID: 1000
+      #CERTBOT_PLUGINS: >-
+      #  certbot_dns_cloudflare
+      #  certbot-dns-route53
+      #CERTBOT_PLUGIN_DEBUG: true
+      #CERTBOT_RENEW_SYNTAX: '--deploy-hook /path/to/renewal-hooks/filename.sh'
+      #CERTBOT_RENEW_RUNONSTART: true
+      #CERTBOT_RENEW_CRON: true #enable cron
+      #CERTBOT_RENEW_CRON_SCHEDULE: '*/5 * * * *' #every 5 minutes
+      #CERTBOT_RENEW_CRON_MAX_SLEEPTIME: 0 #disable (not recommended), in seconds, 21600 is 6 hours
+      #CERTBOT_RENEW_CRON_SCHEDULE: '0 */3 * * *' #every 3 hours
+      #CERTBOT_RENEW_CRON_MAX_SLEEPTIME: '(( 3 * 60 * 60 ) -1)' #every 3 hours
+      HOOK_INSTALL: true #enables the hook deployments/installs
+    volumes:
+      - ./config:/config
+      - ./etc/letsencrypt:/etc/letsencrypt
+      - ./var/log/letsencrypt:/var/log/letsencrypt
+    command: >-
+      certonly --dns-cloudflare
+        --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini
+        --dns-cloudflare-propagation-seconds 30
+        --email admin@domain.tld
+        --agree-tos
+        --no-eff-email
+        --rsa-key-size 4096
+        --keep-until-expiring
+        -d subdomain.domain.tld
+```
