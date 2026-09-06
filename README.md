@@ -79,10 +79,12 @@ Renewal's can operate as the stock docker image by command using "renew" after c
 ## Certbot-Controller Renew Schedule/Cron
 Certbot-Controller's default and certbot's recommended cron schedule is `0 */12 * * *` (the 12th hour) with a random sleep between 0 and 43,199 (12 Hours), functionally executing randomly in a 12 hour period. 
 
-Although **not recommended** (see below tip), Cronjob customization are defined using **'CERTBOT_RENEW_CRON_SCHEDULE'** and **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'**. For scheduling [crontab guru](https://crontab.guru/) is a good resource.  Sleep periods are always between 0 and a maximum, hence a max sleeptime variable. This randomness prevents throttling 'Let's Encrypt' servers on an exact schedule.  It can however be disabled when set to 0.
+Although **not recommended** (see below tip), Cronjob customization are defined using **'CERTBOT_RENEW_CRON_SCHEDULE'** and **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'**. For scheduling [crontab guru](https://crontab.guru/) is a good resource.  Sleep periods are always between 0 and a maximum, hence a max sleeptime variable. This randomness prevents throttling 'Let's Encrypt' servers on an exact schedule.  It can however be disabled when set to 0.  
+
+When setting only **'CERTBOT_RENEW_CRON_SCHEDULE'**, sleep will be disabled, and **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'** should be set to randomize execution.
 
 > [!TIP]
-> Sleep periods should coincide within the schedule period. As cron executes at the scheduled time, the renew process will wait (sleep) to execute. If your sleep is past the next scheduled run, you will get odd results within your schedule. For example, if you schedule every 5 minutes and sleep for 12 hours, renew will not execute every 5 minutes, but create a run job every 5 minutes and they will all execute randomly over a 12 hour period.  Settings like this can throttle the Let's Encrypt servers and block you from renewing certificates, hency why its **not recommended**, it's not just to prevent throttling on scheduled times.
+> Sleep periods should coincide within the schedule period. As cron executes at the scheduled time, the renew process will wait (sleep) to execute. If your sleep is past the next scheduled run, you will get odd results within your schedule. For example, if you schedule every 5 minutes and sleep for 12 hours, renew will not execute every 5 minutes, but create a run job every 5 minutes and they will all execute randomly over a 12 hour period. Settings like this can throttle the Let's Encrypt servers and block you from renewing certificates, hence why its **not recommended**, it's not just to prevent throttling on scheduled times.
 >
 > However, if you wise to execute, for example, at 4am with an random sleep of 1 hour, creating a more routine maintenance windows.  This can be done using a schedule of `0 4 * * *` and sleep `3600`.
 >

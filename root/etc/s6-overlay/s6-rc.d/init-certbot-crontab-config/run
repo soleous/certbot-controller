@@ -45,14 +45,12 @@ main() {
   # script functional variables
   ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
 
-
-  # conditional exits
+  # conditional exit: as this is a dependency to svc-crond and halt is apart of svc-crond.
   if [[ ! "${CERTBOT_RENEW_CRON}" == true ]]; then
     return 0
   fi
 
-
-  # verify crontab commands can execute
+  # conditional exit: verify crontab commands can execute
   if ! ( builtin command -v busybox >/dev/null 2>&1 && [[ $(busybox || true) =~ [[:space:]](crontab)([,]|$) ]] ); then
     # error: error with crontab command execution
     exiterr=1
@@ -61,7 +59,7 @@ main() {
   fi
 
 
-  # verify crontab edit config
+  # conditional exit: verify crontab edit config
   if [[ "$( (busybox crontab -l 2>/dev/null) | busybox crontab - 2> >(sed '/\.cache\/crontab/d') >- | tee /dev/stderr )" ]]; then
     # error: error editing crontab config
     exiterr=1
@@ -70,8 +68,9 @@ main() {
   fi
 
   # script default variables: additions and changes
+  
+  # defaults to 0 if ENV CERTBOT_RENEW_CRON_SCHEDULE is set with no CERTBOT_RENEW_CRON_MAX_SLEEPTIME
   if [[ ${CERTBOT_RENEW_CRON_SCHEDULE} ]] && [[ ! ${CERTBOT_RENEW_CRON_MAX_SLEEPTIME} ]]; then
-    #defaults to 0 if ENV CERTBOT_RENEW_CRON_SCHEDULE is set with no CERTBOT_RENEW_CRON_MAX_SLEEPTIME
     CERTBOT_RENEW_CRON_MAX_SLEEPTIME=0
   fi
   : ${CERTBOT_RENEW_CRON_SCHEDULE:="0 */12 * * *"}
