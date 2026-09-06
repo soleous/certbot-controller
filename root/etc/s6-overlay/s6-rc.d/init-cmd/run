@@ -15,8 +15,8 @@
 ##############################################################################
 #                                 VERSIONING                                 #
 ##############################################################################
-VERSION="1.1"
-DATE="2026-08-30 12:50 UTC"
+VERSION="1.2"
+DATE="2026-09-06 15:15 UTC"
 AUTHOR="Soleous (https://github.com/soleous)"
 
 ##############################################################################
@@ -54,8 +54,9 @@ main() {
       echo "${ORIGIN_DIR}: error: When executing '${COMMAND}' as user '${NON_ROOT_USER}': command exited ${exiterr}"
       exit ${exiterr}
     fi
+  elif [[ ! $CERTBOT_RENEW_CRON == true ]] && [[ ! ${CERTBOT_RENEW_RUNONSTART} == true ]]; then
+    echo "${ORIGIN_DIR}: info: No command or variables set for renewal. See documentation at 'https://github.com/soleous/certbot-controller'"
   fi
-
 }
 
 ##############################################################################

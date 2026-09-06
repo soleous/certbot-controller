@@ -5,9 +5,11 @@
 ##############################################################################
 
 # This is a hook prior to the first program to launched at container start.
-# Certbot's normal behaviour uses a docker ENTRYPOINT of "certbot" and CMD
-# for syntax. This program creates a file of the certbot command to be
-# called by the init-certbot service.
+# Certbot's normal behaviour uses a docker ENTRYPOINT as "certbot" and CMD
+# for syntax. This program extracts this CMD to a file to be called at a later
+# time by the init-cmd service.
+
+entrypoint.sh
 
 CERTBOT_COMMAND_FILE="/etc/s6-overlay/s6-rc.d/init-cmd/command"
 CERTBOT_COMMAND="certbot $*"

@@ -42,14 +42,23 @@ RUN \
     openssh-client \
     yq
 
+# tidy up
+RUN \
+  echo "**** Cleanup ****" && \
+  rm -rf /tmp/*
+
+# container variables
+ENV \
+  CONTAINER_DIR_CONFIG="/config" \
+  CONTAINER_DIR_SCRIPTS="/scripts"
+
 # create non-root users and groups
 ARG \
   PUID=911 \
   PGID=911
 
 ENV \
-  NON_ROOT_USER="certbot" \
-  CONTAINER_DIR_CONFIG="/config"
+  NON_ROOT_USER="certbot"
 
 RUN \
   echo "**** Create none-root group and user: ${NON_ROOT_USER} ****" && \
@@ -58,11 +67,23 @@ RUN \
   mkdir -p ${CONTAINER_DIR_CONFIG} && \
   chown -R ${NON_ROOT_USER}:${NON_ROOT_USER} ${CONTAINER_DIR_CONFIG}
 
-# create directories and set permissions for non-root application use
+# add local files and correct permissions
+COPY --chmod=755 root/ /
+## bug using --chmod https://github.com/moby/moby/issues/52739
+RUN \
+  echo "**** Temp fix for known bug with --chmod ****" && \
+  chmod 755 /entrypoint.sh && \
+  chmod -R 750 /scripts
 
+RUN \
+  echo "**** Changing permissions of s6 services ****" && \
+  find /etc/s6-overlay/ -type f -exec chmod 644 {} + && \
+  find /etc/s6-overlay/s6-rc.d/ -type f -name 'run' -exec chmod 755 {} + && \
+  find /etc/s6-overlay/s6-rc.d/ -type f -name 'finish' -exec chmod 755 {} + 
+
+# create directories and set permissions for non-root application use
 ENV \
   CERTBOT_DIR_PLUGINS="${CONTAINER_DIR_CONFIG}/plugins" \
-  CONTAINER_DIR_SCRIPTS="/scripts" \
   CERTBOT_DIR_CONFIG="/etc/letsencrypt" \
   CERTBOT_DIR_WORK="/var/lib/letsencrypt" \
   CERTBOT_DIR_LOGS="/var/log/letsencrypt"
@@ -75,22 +96,11 @@ RUN \
     ${CERTBOT_DIR_WORK} \
     ${CERTBOT_DIR_LOGS} && \
   chown -R ${NON_ROOT_USER}:${NON_ROOT_USER} \
+    ${CERTBOT_DIR_PLUGINS} \
     ${CERTBOT_DIR_CONFIG} \
     ${CERTBOT_DIR_WORK} \
     ${CERTBOT_DIR_LOGS}
 
-# Tidy up
-RUN \
-  echo "**** Cleanup ****" && \
-  rm -rf /tmp/*
-
-# add local files
-COPY --chmod=755 root/ /
-RUN \
-  echo "**** Changing permissions of s6 services ****" && \
-  find /etc/s6-overlay/s6-rc.d/ -type f -exec chmod 644 {} + && \
-  find /etc/s6-overlay/s6-rc.d/ -type f -name 'run' -exec chmod 755 {} + && \
-  find /etc/s6-overlay/s6-rc.d/ -type f -name 'finish' -exec chmod 755 {} + 
 
 # create metadata
 ARG \

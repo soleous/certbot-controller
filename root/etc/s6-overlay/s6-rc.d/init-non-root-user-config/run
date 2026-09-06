@@ -13,8 +13,8 @@
 ##############################################################################
 #                                 VERSIONING                                 #
 ##############################################################################
-VERSION="1.1"
-DATE="2026-08-30 12:50 UTC"
+VERSION="1.2"
+DATE="2026-09-06 13:00 UTC"
 AUTHOR="Soleous (https://github.com/soleous)"
 
 ##############################################################################
@@ -24,7 +24,6 @@ AUTHOR="Soleous (https://github.com/soleous)"
 main() {
 # script functional variables
 ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
-
 
 # Change UID, GID and set permissions
 if [[ ${PUID} ]] && [[ ${PUID} != $(id -u ${NON_ROOT_USER}) ]]; then
@@ -43,7 +42,6 @@ echo "${ORIGIN_DIR}: info: Changing owner and group of required paths to: ${NON_
 chown -R ${NON_ROOT_USER}:${NON_ROOT_USER} \
          ${CONTAINER_DIR_CONFIG} \
          ${CERTBOT_DIR_CONFIG} \
-         ${CONTAINER_DIR_SCRIPTS} \
          ${CERTBOT_DIR_WORK} \
          ${CERTBOT_DIR_LOGS}
 }

@@ -18,7 +18,7 @@
 #                                 VERSIONING                                 #
 ##############################################################################
 VERSION="1.2"
-DATE="2026-08-30 21:46 UTC"
+DATE="2026-09-06 1:05 UTC"
 AUTHOR="Soleous (https://github.com/soleous)"
 
 ##############################################################################
@@ -80,11 +80,11 @@ function certbot_hook_install () {
       # checks if version are the same between source and destination
       if [[ ! "$DEST_FILE_VERSION" == "$SOURCE_FILE_VERSION" ]]; then
         echo "${ORIGIN_DIR}: info: Updating renewal-hook '${FILE}' to '${DEST_ROOT}/${HOOK_TYPE}'"
-        cp -a ${SOURCE} ${DEST}
+        cp ${SOURCE} ${DEST}
       fi
     else
       echo "${ORIGIN_DIR}: info: Install renewal-hook '${FILE}' to '${DEST_ROOT}/${HOOK_TYPE}'"
-      cp -a ${SOURCE} ${DEST}
+      cp ${SOURCE} ${DEST}
     fi
   done
 

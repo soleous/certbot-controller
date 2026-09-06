@@ -12,8 +12,8 @@
 ##############################################################################
 #                                 VERSIONING                                 #
 ##############################################################################
-VERSION="1.1"
-DATE="2026-08-30 12:50 UTC"
+VERSION="1.2"
+DATE="2026-09-06 15:15 UTC"
 AUTHOR="Soleous (https://github.com/soleous)"
 
 ##############################################################################
@@ -37,6 +37,10 @@ main() {
       echo "${ORIGIN_DIR}: error: 'crond' not found: exit code ${exiterr}"
       exit ${exiterr}
     fi
+  else
+    # exit if cron not enabled
+    echo 0 > /run/s6-linux-init-container-results/exitcode
+    exec /run/s6/basedir/bin/halt
   fi
 }
 
