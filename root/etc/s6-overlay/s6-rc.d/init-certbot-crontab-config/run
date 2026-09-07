@@ -112,7 +112,6 @@ main() {
     exec /run/s6/basedir/bin/halt
   fi
 
-
   terminal_cron_schedule "${CERTBOT_RENEW_COMMAND}" "Certbot Renew" "${CERTBOT_RENEW_CRON_MAX_SLEEPTIME}"
 
 }

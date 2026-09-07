@@ -60,8 +60,8 @@ When multiple certificates of the same name are created certbot will add a ‘-0
 | CERTBOT_RENEW_RUNONSTART | false | true | Runs renewal when the container starts. |
 | CERTBOT_RENEW_SYNTAX | none | `--deploy /config/hook.sh` | Extra syntax, for when 'certbot renew' is executed. |
 | CERTBOT_RENEW_CRON | false | true | Enables cron scheduling and the container will not exit after execution. |
-| CERTBOT_RENEW_CRON_SCHEDULE | `0 */12 * * *` (every 12th hour) | `0 0 * * *` | Set [crontab](https://man7.org/linux/man-pages/man5/crontab.5.html) schedule to a custom value. **Not recommended** |
-| CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 86400 | A sleep period (in seconds) is added to the cronjob and randomizes the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0. **Not recommended** |
+| CERTBOT_RENEW_CRON_SCHEDULE | `0 */12 * * *` (every 12th hour) | `0 0 * * *` | Set [crontab](https://man7.org/linux/man-pages/man5/crontab.5.html) schedule to a custom value. **See [below](#Certbot-Controller-Renew-ScheduleCron) before continuing**.|
+| CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 86400 | A sleep period (in seconds) is added to the cronjob and randomizes the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0. **See [below](#Certbot-Controller-Renew-ScheduleCron) before continuing**. |
 
 ## Certbot Official Plugins
 Official plugins are installed by download from certbot's github repository.  Default plugin names can be found in certbot's github using their directory or release name (kebab-case "-" or "_" are both accepted). For Example cloudflare's name is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare" or "certbot_dns_cloudflare".  All default plugins must be available as an asset in their releases.
@@ -77,18 +77,31 @@ For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to '
 Renewal's can operate as the stock docker image by command using "renew" after certificates have been created. However certbot-controller adds environmental variable **'CERTBOT_RENEW_RUNONSTART'** that will run renewal when the container starts. When finished it will exit, unless **'CERTBOT_RENEW_CRON'** is 'true', which will enable the cron services using certbot recommended configuration.  The **'CERTBOT_RENEW_SYNTAX'** variable adds additional syntax for the renewal command, for example `--deploy /config/hook.sh`.
 
 ## Certbot-Controller Renew Schedule/Cron
-Certbot-Controller's default and certbot's recommended cron schedule is `0 */12 * * *` (the 12th hour) with a random sleep between 0 and 43,199 (12 Hours), functionally executing randomly in a 12 hour period. 
+Certbot-Controller's default and certbot's recommended cron schedule is `0 */12 * * *` (the 12th hour) with a random sleep between 0 and 43,199 (12 Hours), functionally executing randomly in a 12 hour interval. 
 
-Although **not recommended** (see below tip), Cronjob customization are defined using **'CERTBOT_RENEW_CRON_SCHEDULE'** and **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'**. For scheduling [crontab guru](https://crontab.guru/) is a good resource.  Sleep periods are always between 0 and a maximum, hence a max sleeptime variable. This randomness prevents throttling 'Let's Encrypt' servers on an exact schedule.  It can however be disabled when set to 0.  
+### Customization
+Customization of the renew Cronjob is **not normally recommended** because of the [Slashdot effect](https://en.wikipedia.org/wiki/Slashdot_effect) and Let's Encrypts throttle protection, which can resulting in being blocked from creating or renewing certificates. Use at your own risk and please respect Let's Encrypt servers.
 
-When setting only **'CERTBOT_RENEW_CRON_SCHEDULE'**, sleep will be disabled, and **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'** should be set to randomize execution.
+#### Environmental Variable Settings
+* **'CERTBOT_RENEW_CRON_SCHEDULE'**
+  * Sets the scheduled interval using a crontab format such as `* * * * *`. See [crontab](https://man7.org/linux/man-pages/man5/crontab.5.html) and [crontab guru](https://crontab.guru/) for more information.
+* **'CERTBOT_RENEW_CRON_MAX_SLEEPTIME'**
+  * Sets a maximum value for a random sleep period before the renewal job executes and makes the execution random. The random sleep period is calculated between 0 and this maximum value in seconds (for example, between 0 and 43199).
+
+When only using a custom schedule, the sleep setting is disabled by default to avoid conflicts.  It's recommended to configure a sleep period with a custom schedule.
 
 > [!TIP]
-> Sleep periods should coincide within the schedule period. As cron executes at the scheduled time, the renew process will wait (sleep) to execute. If your sleep is past the next scheduled run, you will get odd results within your schedule. For example, if you schedule every 5 minutes and sleep for 12 hours, renew will not execute every 5 minutes, but create a run job every 5 minutes and they will all execute randomly over a 12 hour period. Settings like this can throttle the Let's Encrypt servers and block you from renewing certificates, hence why its **not recommended**, it's not just to prevent throttling on scheduled times.
+> #### Avoiding Conflicts
+> Sleep settings should coincide within the scheduled interval. As a schedule can have irregular intervals there are currently no limits to the sleep period.
 >
-> However, if you wise to execute, for example, at 4am with an random sleep of 1 hour, creating a more routine maintenance windows.  This can be done using a schedule of `0 4 * * *` and sleep `3600`.
+> Cron executes at the scheduled time and the renew process will wait (sleep) to execute. If your sleep is past the next scheduled run, you will get a conflict. For example, if you schedule every 5 minutes and sleep for 12 hours, renew will not execute every 5 minutes, but create a run job every 5 minutes and they will all execute randomly over a 12 hour period.
 >
-> Use at your own risk and please respect Let's Encrypt servers.
+> Let say an administrator would like a more routine maintenance windows, a good example is a schedule at 4am with an random sleep of 1 hour. The random sleep is within the 24 hour interval and will not create a conflict. This can be done using a schedule of `0 4 * * *` and sleep `3600`.
+>
+> #### Irregular Intervals
+> Cron intervals can be irregular, for example `* */23 * * *` this does not run every 23 hours, but at 23:00 and at 0:00.  This results in a 23 hour interval followed by 1 hour.
+>
+> When setting a sleep period for an irregular interval, to avoid conflicts set the sleep period to the minimum interval, for the above bad example, a maximum sleep of 1 hour will prevent a conflict.
 
 ## Certbot-Controller Renewal Hooks
 Renewal Hooks are scripts that execute on renewal of a certificate.  They automate common tasks such as creating PFX files or deploying the certificates. For more information on hooks see the following [certbot documentation](https://eff-certbot.readthedocs.io/en/stable/using.html#renewing-certificates).
