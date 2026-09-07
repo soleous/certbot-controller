@@ -115,7 +115,7 @@ main() {
         echo "error: failed creation: exit code ${exiterr}"
       fi
       # change file permissions, default 600
-      chmod 660 $OPENSSL_OUT_FILE
+      chmod 644 $OPENSSL_OUT_FILE
     fi
   done
 

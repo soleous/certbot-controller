@@ -203,15 +203,15 @@ Log outputs are verbose, therefore executing `certbot logs container-name` will 
 # ID Mapping, Security and Certificate Deployment
 Within certbot-controller, certbot is executed using user and group IDs (default 911), they can be customized using variable **'PUID'** and **'PGID'**. All files within `/config`, `/etc/letsencrypt` and `var/log/letsencrypt` will therefore use the same IDs.
 
-Certbot certificate file permissions can be shown by executing `ls -l etc/letsencrypt/archive/subdomain.domain.tld/` and by default the owner has 'read/write' for private keys and public keys. Groups and others get 'read' only for public keys. When deploying these certificates manually permissions may need to be changed to allow other applications to read them.
+Certbot certificate file permissions can be shown by executing `ls -l etc/letsencrypt/archive/subdomain.domain.tld/` and by default the owner has 'read/write' for private keys and public keys. Group and other get 'read' only for public keys. When deploying these certificates manually permissions may need to be changed to allow other applications to read them.
 
 ### Renewal-hook: SCP
 
-When using the SCP renewal-hook, files are transferred using the **remote user** and therefore **permissions** on the **remote host**.  If this **remote user** does not have correct permissions to the file, expect a `Permission denied`.
+When using the SCP renewal-hook, files are transferred using the **remote user** and therefore **permissions** on the **remote host**.  If this **remote user** does not have correct permissions to the destination, expect a `Permission denied`.
 
 To configure correct permissions on the remote host, there are several options, however, for security reasons, the following is recommended:
 * Do not use a high privileged user for example root or critical services owner
-* Create a user specifically for certificate management/transfer and only give it permissions to files its transferring
+* Create a user specifically for certificate management/transfer and only give it permissions to destination files or paths its transferring to
 * Shared access between applications and containers via groups and make the user a member
 * Set permissions at a minimal, file permissions are not changed on the remote server when transferring files
 
@@ -222,7 +222,7 @@ To configure correct permissions on the remote host, there are several options, 
 ### Renewal-hook: PFX
 PFX files are created for specific domains only. The default password is weak, as it's documented here, being the file name without suffix, it's recommended to set a password.
 
-PFX file permissions are by default 'read/write' for users and groups, others have none.
+PFX file permissions are by default 'read/write' for owner and 'read' only for group and other.
 
 # Examples
 
