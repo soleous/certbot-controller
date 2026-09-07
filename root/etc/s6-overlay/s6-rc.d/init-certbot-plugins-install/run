@@ -37,22 +37,18 @@ main() {
   # script functional variables
   ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
 
-
   # script default variables: additions and changes
   CERTBOT_VERSION="$(certbot --version | sed -nE 's/(^.*certbot )(.*)/\2/p')"
   CERTBOT_DIR_PLUGINS_LOG="${CONTAINER_DIR_CONFIG}/logs/plugin-install" # no leading /
   CERTBOT_DIR_PLUGINS_CERTBOT="/opt/certbot/src/plugins" # no leading /
   CERTBOT_DIR_PLUGINS_CUSTOM="${CERTBOT_DIR_PLUGINS}" # no leading /
 
-
   # create folder if doesn't exist
   mkdir -p "${CERTBOT_DIR_PLUGINS_CERTBOT}"
-
 
   # script default variables: additions and changes
   CERTBOT_PLUGINS=$(sed -E 's/ {1,}/ /g' <<< ${CERTBOT_PLUGINS})
   IFS=' ' read -a CERTBOT_PLUGINS <<< "${CERTBOT_PLUGINS}"
-
 
   # Install official plugins using CERTBOT_PLUGINS variable from ENV
   for PLUGIN_ENV in "${CERTBOT_PLUGINS[@]}"; do
@@ -109,7 +105,6 @@ main() {
     fi
   done
 
-
   # Install any plugins in the custom plugins directory
   for PLUGIN_PATH in ${CERTBOT_DIR_PLUGINS_CUSTOM}/*/; do
     # If it is a directory only
@@ -144,7 +139,6 @@ main() {
       fi
     fi
   done
-
 }
 
 ##############################################################################

@@ -58,7 +58,6 @@ main() {
     return ${exiterr}
   fi
 
-
   # conditional exit: verify crontab edit config
   if [[ "$( (busybox crontab -l 2>/dev/null) | busybox crontab - 2> >(sed '/\.cache\/crontab/d') >- | tee /dev/stderr )" ]]; then
     # error: error editing crontab config
@@ -67,22 +66,23 @@ main() {
     return ${exiterr}
   fi
 
-  # script default variables: additions and changes
+  # script default variables: cronjob construction
   
   # defaults to 0 if ENV CERTBOT_RENEW_CRON_SCHEDULE is set with no CERTBOT_RENEW_CRON_MAX_SLEEPTIME
   if [[ ${CERTBOT_RENEW_CRON_SCHEDULE} ]] && [[ ! ${CERTBOT_RENEW_CRON_MAX_SLEEPTIME} ]]; then
     CERTBOT_RENEW_CRON_MAX_SLEEPTIME=0
   fi
+
   : ${CERTBOT_RENEW_CRON_SCHEDULE:="0 */12 * * *"}
-  #: ${CERTBOT_RENEW_CRON_MAX_SLEEPTIME:="$((43200 - 1))"} # removed to allow math in ENV
+
   CERTBOT_RENEW_CRON_MAX_SLEEPTIME=$((${CERTBOT_RENEW_CRON_MAX_SLEEPTIME:-"(43200 - 1)"}))
   CERTBOT_RENEW_CRON_SLEEPTIME="$([[ ${CERTBOT_RENEW_CRON_MAX_SLEEPTIME} -ne 0 ]] && echo $((RANDOM % ${CERTBOT_RENEW_CRON_MAX_SLEEPTIME})) || echo 0)"
+
   CERTBOT_RENEW_COMMAND="/etc/s6-overlay/s6-rc.d/init-certbot-renew/run"
   CERTBOT_RENEW_COMMAND_FRIENDLY="certbot renew${CERTBOT_RENEW_SYNTAX/#/ }"
 
   CERTBOT_RENEW_CRON_COMMAND="sleep ${CERTBOT_RENEW_CRON_SLEEPTIME} && ${CERTBOT_RENEW_COMMAND}"
   CERTBOT_RENEW_CRONJOB="${CERTBOT_RENEW_CRON_SCHEDULE} ${CERTBOT_RENEW_CRON_COMMAND}"
-
 
   # amount of cronjobs with ID/command, logic only one is expected
   CRONJOB_ID_TOTAL=$(busybox crontab -l 2>/dev/null | sed -nE "/${CERTBOT_RENEW_COMMAND//\//\\/}/p" | wc -l)

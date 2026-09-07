@@ -47,7 +47,6 @@ function trim() {
   trim="$(sed -E 's/ {1,}/ /g' <<< ${trim})" # trailing whitespace
   trim="$(sed -E 's/ {1,}$//g' <<< ${trim})" # multiple to single space
   echo "${trim}"
-
 }
 
 ############################### Modify Cronjob ###############################
@@ -85,7 +84,6 @@ function crontab_mod() {
 
   # script functional variables
   ORIGIN_DIR="$(basename $(dirname ${BASH_SOURCE[0]}))"
-
 
   # ARG variable configuration
   if [ $# == 0 ]; then
@@ -132,11 +130,9 @@ function crontab_mod() {
     echo "${ORIGIN_DIR}: [${FUNCNAME}] error: incorrect method"
   fi
 
-
   # script default variables: additions and changes
   CRONJOB_ID=${CRONJOB_ID//\//\\/}
   CRONJOB_NAME=${CRONJOB_NAME:-${CRONJOB}}
-
 
   # Methods for changing cronjobs
   if [ ${METHOD} == "add" ]; then
@@ -172,9 +168,7 @@ function crontab_mod() {
       echo "${ORIGIN_DIR}: [${FUNCNAME}] error: [remove] failed removing cronjob '${CRONJOB_NAME}': exit code ${exiterr}"
       return ${exiterr} 
     fi
-
   fi
-
 }
 
 ##################### Cronjob Schedule Terminal Output #######################
@@ -219,12 +213,10 @@ function terminal_cron_schedule() {
   RED='\033[0;31m'          # Red
   NC='\033[0m'              # No Colour
 
-
   # ARG variable configuration
   CRONJOB_ID=$1
   CRONJOB_NAME=$2
   CMD_SLEEP_MAX=$(test $3 && echo $3 || echo 0)
-
 
   # amount of cronjobs with tag, logic only one is expected
   CRONJOBS=$(busybox crontab -l 2>/dev/null | sed -nE "/${CRONJOB_ID//\//\\/}/p")
@@ -238,7 +230,6 @@ function terminal_cron_schedule() {
     return 0
   fi
 
-
   # cronjob schedule different formats
   if [[ ! ${CRONJOB} =~ ^\@ ]]; then
     SCHEDULE="$(IFS=' ' read -a array <<< "${CRONJOB}"; echo "${array[*]:0:5}")"
@@ -246,18 +237,15 @@ function terminal_cron_schedule() {
     SCHEDULE="$(sed -nE 's/^(@\w*)(.*)$/\1/p' <<< ${CRONJOB})"
   fi
 
-
   # sleep command value (if no value set to 0)
   CMD_SLEEP=$(echo "${CRONJOB//"${SCHEDULE}" }" | sed -nE "s/^sleep (\d+) && .*$/\1/p")
   CMD_SLEEP=$(test $CMD_SLEEP && echo ${CMD_SLEEP} || echo 0)
-
 
   # cronnext date formatting for terminal output
   CRONNEXT="$(date -d @$(($(cronnext -j "${CRONJOB_ID}" | sed -nE 's/(^.*next: )(.*)/\2/p') + ${CMD_SLEEP})))"
   if [[ -z "${CRONNEXT}" ]]; then
     CRONNEXT="Error in CRONNEXT syntax..."
   fi
-
 
   # terminal output
   echo -e "${YELLOW}"
@@ -288,5 +276,4 @@ function terminal_cron_schedule() {
   echo -e "${NC}"
 
   return $?
-
 }

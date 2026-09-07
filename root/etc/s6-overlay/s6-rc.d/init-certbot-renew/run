@@ -35,11 +35,9 @@ main() {
   RED='\033[0;31m'          # Red
   NC='\033[0m'              # No Colour
 
-
   # script default variables: additions and changes
   CERTBOT_RENEW_COMMAND="certbot renew${CERTBOT_RENEW_SYNTAX/#/ }"
   CERTBOT_CRONTAB_UPDATE_COMMAND="/etc/s6-overlay/s6-rc.d/init-certbot-crontab-config/run"
-
 
   # run renew on start
   if [[ $1 == "runonstart" ]]; then
@@ -74,7 +72,6 @@ function certbot_renew() {
     echo "${ORIGIN_DIR}: error: 'certbot' not found: exit code ${exiterr}"
     exit ${exiterr}
   fi
-
 }
 
 ##############################################################################
