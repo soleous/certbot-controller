@@ -30,6 +30,7 @@ The core functionality is complete and added quality of life improvements will b
 
 * Docker image deployment (in progress)
 * CI/CD implementation for rolling updates from certbot (in progress)
+* Cron irregular interval detection and overrides
 * Improve certificate creation workflows
 * Add methods to automate ssh key creation
 * Renew automation (renewal-hook) to change permissions, owners and groups
