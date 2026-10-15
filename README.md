@@ -19,7 +19,7 @@ Certbot-controller is built on top of the '[certbot](https://github.com/certbot/
   * Scheduled certificate renewal using certbot's recommended configuration
   * Customize certbot's renewal schedule (including random sleep periods)
   * Certificate renewal on container start
-  * Renew automation (renewal-hooks) to:
+  * Renew automation (renewal hooks) to:
     * Transfer certificates to remote servers, using SCP
     * Create pfx files
 * Install more than one plugin on a single docker instance
@@ -33,16 +33,16 @@ The core functionality is complete and added quality of life improvements will b
 * Cron irregular interval detection and overrides
 * Improve certificate creation workflows
 * Add methods to automate ssh key creation
-* Renew automation (renewal-hook) to change permissions, owners and groups
-* Renew automation (renewal-hook) for local transfer
+* Renew automation (renewal hook) to change permissions, owners and groups
+* Renew automation (renewal hook) for local transfer
 * Expose configuration outside of environmental variables
 * Email notifications for conditions such as expiration warnings, renewals and failures
 * Triggers for external services
-* Docker integration for renew automation (renewal-hook)
+* Docker integration for renew automation (renewal hook)
 * Web UI for certificate management and monitoring
 
 # Usage
-Certbot-controller is designed to operate as close to certbot’s docker image as possible, however non-root configuration and extra tools are an operational requirement. The majority of features are optional, including, “always up” cron scheduling, packaged renewal-hooks, plugin installs, etc. By design this should swap into existing workflows, with the exception of running as root or docker user.
+Certbot-controller is designed to operate as close to certbot’s docker image as possible, however non-root configuration and extra tools are an operational requirement. The majority of features are optional, including, “always up” cron scheduling, packaged renewal hooks, plugin installs, etc. By design this should swap into existing workflows, with the exception of running as root or docker user.
 
 ### Unsolicited Advice
 If this is the first time using certbot, I would recommend creating a certificate in Let's Encrypt's staging environment first, by adding ‘--staging’ to the command syntax.  Certbot's public services will throttle duplicate certificates of the same name, limited to 5 certificates over a 7 day period. 
@@ -109,11 +109,28 @@ Renewal Hooks are scripts that execute on renewal of a certificate.  They automa
 
 Packaged with certbot-controller are the following hooks, however they are not installed by default, they are enabled by setting **'HOOK_INSTALL'** to 'true'.
 
-* Deploy certificate files via SCP to remote servers
-* Create PFX certificate files
+### Renewal Hook: SCP
+
+Used to deploy certificate files using secure copy protocol (SCP) to remote servers.
+
+When using the SCP renewal hook, files are transferred using the **remote user** and therefore **permissions** on the **remote host**.  If this **remote user** does not have correct permissions to the destination, expect a `Permission denied`.
+
+To configure correct permissions on the remote host, there are several options, however, for security reasons, the following is recommended:
+* Do not use a high privileged user for example root or critical services owner
+* Create a user specifically for certificate management/transfer and only give it permissions to destination files or paths its transferring to
+* Share access between applications and containers via groups and make the user a member
+* Set permissions at a minimal, file permissions are not changed on the remote server when transferring files
+
+> [!CAUTION]
+> Use at your own risk, the biggest recommendation is to understand your architecture and assess the risks of your configuration.  We take no liability.
+
+
+### Renewal Hook: PFX
+
+Used to create certificate files using the PFX (PKCS#12) format.
 
 ### Configuration
-All hook configurations are located in `\config\certbot-controller.yaml`.
+All hook configurations packed with certbot-controller are located in `\config\certbot-controller.yaml` using yaml.
 
 ```YAML
 hooks:
@@ -154,11 +171,15 @@ hooks:
           password: super-secret-password #optional, default is the file name without extension
 
 ```
-If a hook requires configuration, it can be entered in the above file using yaml. Configuration can link to different yaml blocks, for example scp connections, link to the connections block. If you do not require for example pfx file creation, this section can be deleted from your yaml file.
+Configuration can link to different yaml blocks, for example scp connections, link to the connections block. If you do not require for example pfx file creation, this section can be deleted from your yaml file.
 
-Certificate names are defined by certbot and executing the command `certificates` will display all current certificates and their state.
+Certificate names are not always the domain name.  To view all certificates managed by certbot run `certbot certificates` for example:
 
-### Testing Renewal-hook Outside of the Renewal Process
+```bash
+docker exec -u certbot -it certbot-controller certbot certificates
+```
+
+### Testing Renewal Hook Outside of the Renewal Process
 If a script errors or fails while renewing, they can be debugged, tested or rerun outside of the renewal process by directly executing the script using additional arguments.
 
 1. Put the container into an always running state by using environment variable `CERTBOT_RENEW_CRON=true`.
@@ -187,7 +208,7 @@ Alternatively, shell into the container using bash `docker exec -u certbot -it c
 > Using `docker exec` will execute by default as `root` therefore its recommended to use `-u certbot` or `--user certbot` for all commands to prevent false positive results or certificate permission issues.
 
 ### Creating SSH Keys
-If the renewal-hook script requires ssh keys, the following is a brief description on how to create them:
+If the renewal hook script requires ssh keys, the following is a brief description on how to create them:
 
 #### Execute on the certbot-controller host
 ```bash
@@ -213,27 +234,6 @@ Log outputs are verbose, therefore executing `certbot logs container-name` will 
 
 # ID Mapping, Security and Certificate Deployment
 Within certbot-controller, certbot is executed using user and group IDs (default 911), they can be customized using variable **'PUID'** and **'PGID'**. All files within `/config`, `/etc/letsencrypt` and `var/log/letsencrypt` will therefore use the same IDs.
-
-Certbot certificate file permissions can be shown by executing `ls -l etc/letsencrypt/archive/subdomain.domain.tld/` and by default the owner has 'read/write' for private keys and public keys. Group and other get 'read' only for public keys. When deploying these certificates manually permissions may need to be changed to allow other applications to read them.
-
-### Renewal-hook: SCP
-
-When using the SCP renewal-hook, files are transferred using the **remote user** and therefore **permissions** on the **remote host**.  If this **remote user** does not have correct permissions to the destination, expect a `Permission denied`.
-
-To configure correct permissions on the remote host, there are several options, however, for security reasons, the following is recommended:
-* Do not use a high privileged user for example root or critical services owner
-* Create a user specifically for certificate management/transfer and only give it permissions to destination files or paths its transferring to
-* Share access between applications and containers via groups and make the user a member
-* Set permissions at a minimal, file permissions are not changed on the remote server when transferring files
-
-> [!CAUTION]
-> Use at your own risk, the biggest recommendation is to understand your architecture and assess the risks of your configuration.  We take no liability.
-
-
-### Renewal-hook: PFX
-PFX files are created for specific domains only. The default password is weak, as it's documented here, being the file name without suffix, it's recommended to set a password.
-
-PFX file permissions are by default 'read/write' for owner and 'read' only for group and other.
 
 # Examples
 

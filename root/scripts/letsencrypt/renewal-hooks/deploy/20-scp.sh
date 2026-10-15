@@ -53,8 +53,8 @@
 ##############################################################################
 #                                 VERSIONING                                 #
 ##############################################################################
-VERSION="2.0"
-DATE="2026-10-15 12:41 UTC"
+VERSION="2.1"
+DATE="2026-10-15 21:21 UTC"
 AUTHOR="Soleous (https://github.com/soleous)"
 
 ##############################################################################
@@ -81,18 +81,23 @@ main() {
   CERTBOT_CERT_NAME=$(basename "$RENEWED_LINEAGE")
 
   # script default variables
-  SCP_CONFIG_FILE=${CONTAINER_DIR_CONFIG}/certbot-controller.yaml
+  CONFIG_FILE=${CONTAINER_DIR_CONFIG}/certbot-controller.yaml
   SSH_KEY_FILE_PATH=${CONTAINER_DIR_CONFIG}/.ssh
   CONNECTION_TIMEOUT_DEFAULT=15
 
+  # default variable override - config file
+  if [[ -n "$ARG_CONFIG" ]]; then
+    CONFIG_FILE=${ARG_CONFIG}
+  fi
+
   # conditional exit if no YAML file
-  if [[ ! -f "${SCP_CONFIG_FILE}" ]]; then
+  if [[ ! -f "${CONFIG_FILE}" ]]; then
     # error handling, for cli execution
     if [[ -n "$ARG_CERT_NAME" ]]; then
-      echo "error: YAML file '${SCP_CONFIG_FILE}' does not exist. See documentation at 'https://github.com/soleous/certbot-controller'"
+      echo "error: YAML file '${CONFIG_FILE}' does not exist. See documentation at 'https://github.com/soleous/certbot-controller'"
       exit 1
     else
-      echo "info: YAML file '${SCP_CONFIG_FILE}' is missing"
+      echo "info: YAML file '${CONFIG_FILE}' is missing"
       exit 0
     fi
   fi
@@ -105,7 +110,7 @@ main() {
   fi
 
   # read hooks block from certbot-controller.yaml
-  HOOKS_YAML=$(yq '.hooks' ${SCP_CONFIG_FILE})
+  HOOKS_YAML=$(yq '.hooks' ${CONFIG_FILE})
 
   # read connections amd Certificate to SCP for parsing
   readarray -t CONNECTIONS < <(echo "$HOOKS_YAML" | yq -o=j -I=0 '.connections' -)
@@ -186,6 +191,29 @@ if [[ "$SCP_EXEC_COUNT" == 0 ]]; then
 fi
 }
 
+################################### Help #####################################
+
+help() {
+  echo -e "usage:"
+  echo -e "  certbot [--cert-name NAME] [options]..."
+  echo -e ""
+  echo -e "20-scp.sh deploys certificate files using SCP to remote servers as part of certbot's renewal hook"
+  echo -e "automatons. It should be used within a certbot-controller container and configuration is stored"
+  echo -e "in a yaml file. When executing manually outside of certbot renewal hooks specify the certificate"
+  echo -e "using '--cert-name'."
+  echo -e ""
+  echo -e "create pfx files:"
+  echo -e "  --cert-name NAME       Certificate to use with this script"
+  echo -e ""
+  echo -e "options:"
+  echo -e "  --help                 show this help message and exit"
+  echo -e "  --version              show script version information"
+  echo -e "  --config CONFIG_FILE   path to config file (default: /config/certbot-controller.yaml)"
+  echo -e ""
+  echo -e "See documentation at 'https://github.com/soleous/certbot-controller' for more information."
+  echo -e ""
+}
+
 ################################## Version ###################################
 
 version() {
@@ -209,7 +237,7 @@ version() {
 if [ $# == 0 ]; then
   # error message for no RENEWED_LINEAGE
   if [[ -z "$RENEWED_LINEAGE" ]]; then
-  echo "Error: No renewal lineage, if executed outside of certbot renewal-hook, please specify a cert-name using --cert-name 'subdomain.domain-name.tld-0001' or --version"
+  echo "Error: No 'renewal lineage' from certbot renewal hook or --cert-name 'subdomain.domain-name.tld-0001' syntax. To display more help details use '--help'."
   exit 1
   fi
 
@@ -223,6 +251,10 @@ else
   # set variables for arguments
   until [ $# == 0 ]; do
     case $1 in
+      --help)
+        ARG_HELP="true"
+        shift
+        ;;
       --version)
         ARG_VERSION="true"
         shift
@@ -231,12 +263,19 @@ else
         ARG_CERT_NAME="${2}"
         shift
         ;;
+      --config)
+        ARG_CONFIG="${2}"
+        shift
+        ;;
     esac
     shift
   done
 
-  # argument: '--version' will only show versioning even if other options are set
-  if [[ $ARG_VERSION == true ]]; then
+  # argument: '--help' and '--version'
+  if [[ $ARG_HELP == true ]]; then
+    help
+    exit 0
+  elif [[ $ARG_VERSION == true ]]; then
     version
     exit 0
   fi

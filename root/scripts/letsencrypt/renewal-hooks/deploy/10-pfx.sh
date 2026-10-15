@@ -26,8 +26,8 @@
 ##############################################################################
 #                                 VERSIONING                                 #
 ##############################################################################
-VERSION="1.3"
-DATE="2026-10-15 12:41 UTC"
+VERSION="1.4"
+DATE="2026-10-15 21:20 UTC"
 AUTHOR="Soleous (https://github.com/soleous)"
 
 ##############################################################################
@@ -54,16 +54,21 @@ main() {
   CERTBOT_CERT_NAME=$(basename "$RENEWED_LINEAGE")
 
   # script default variables
-  SCP_CONFIG_FILE=${CONTAINER_DIR_CONFIG}/certbot-controller.yaml
+  CONFIG_FILE=${CONTAINER_DIR_CONFIG}/certbot-controller.yaml
+
+  # default variable override - config file
+  if [[ -n "$ARG_CONFIG" ]]; then
+    CONFIG_FILE=${ARG_CONFIG}
+  fi
 
   # conditional exit if no YAML file
-  if [[ ! -f "${SCP_CONFIG_FILE}" ]]; then
+  if [[ ! -f "${CONFIG_FILE}" ]]; then
     # error handling, for cli execution
     if [[ -n "$ARG_CERT_NAME" ]]; then
-      echo "error: YAML file '${SCP_CONFIG_FILE}' does not exist. See documentation at 'https://github.com/soleous/certbot-controller'"
+      echo "error: YAML file '${CONFIG_FILE}' does not exist. See documentation at 'https://github.com/soleous/certbot-controller'"
       exit 1
     else
-      echo "info: YAML file '${SCP_CONFIG_FILE}' is missing"
+      echo "info: YAML file '${CONFIG_FILE}' is missing"
       exit 0
     fi
   fi
@@ -77,7 +82,7 @@ main() {
 
 
   # read hooks.deploy.pfx block from certbot-controller.yaml
-  PFX_YAML=$(yq '.hooks.deploy.pfx' ${SCP_CONFIG_FILE})
+  PFX_YAML=$(yq '.hooks.deploy.pfx' ${CONFIG_FILE})
 
   # read all pfx certificate items for parsing
   readarray -t PFX_CERTS < <(echo "$PFX_YAML" | yq -o=j -I=0 '.certificates[]' -)
@@ -135,6 +140,28 @@ if [[ "$PFX_EXEC_COUNT" == 0 ]]; then
 fi
 }
 
+################################### Help #####################################
+
+help() {
+  echo -e "usage:"
+  echo -e "  certbot [--cert-name NAME] [options]..."
+  echo -e ""
+  echo -e "10-pfx.sh creates pfx certificate files as part of certbot's renewal hook automatons. It should be"
+  echo -e "used within a certbot-controller container and configuration is stored in a yaml file. When executing"
+  echo -e "manually outside of certbot renewal hooks specify the certificate using '--cert-name'."
+  echo -e ""
+  echo -e "create pfx files:"
+  echo -e "  --cert-name NAME       Certificate to use with this script"
+  echo -e ""
+  echo -e "options:"
+  echo -e "  --help                 show this help message and exit"
+  echo -e "  --version              show script version information"
+  echo -e "  --config CONFIG_FILE   path to config file (default: /config/certbot-controller.yaml)"
+  echo -e ""
+  echo -e "See documentation at 'https://github.com/soleous/certbot-controller' for more information."
+  echo -e ""
+}
+
 ################################## Version ###################################
 
 version() {
@@ -158,7 +185,7 @@ version() {
 if [ $# == 0 ]; then
   # error message for no RENEWED_LINEAGE
   if [[ -z "$RENEWED_LINEAGE" ]]; then
-  echo "Error: No renewal lineage, if executed outside of certbot renewal-hook, please specify a cert-name using --cert-name 'subdomain.domain-name.tld-0001' or --version"
+  echo "Error: No 'renewal lineage' from certbot renewal hook or --cert-name 'subdomain.domain-name.tld-0001' syntax. To display more help details use '--help'."
   exit 1
   fi
 
@@ -172,6 +199,10 @@ else
   # set variables for arguments
   until [ $# == 0 ]; do
     case $1 in
+      --help)
+        ARG_HELP="true"
+        shift
+        ;;
       --version)
         ARG_VERSION="true"
         shift
@@ -180,12 +211,19 @@ else
         ARG_CERT_NAME="${2}"
         shift
         ;;
+      --config)
+        ARG_CONFIG="${2}"
+        shift
+        ;;
     esac
     shift
   done
 
-  # argument: '--version' will only show versioning even if other options are set
-  if [[ $ARG_VERSION == true ]]; then
+  # argument: '--help' and '--version'
+  if [[ $ARG_HELP == true ]]; then
+    help
+    exit 0
+  elif [[ $ARG_VERSION == true ]]; then
     version
     exit 0
   fi
