@@ -42,7 +42,7 @@ The core functionality is complete and added quality of life improvements will b
 * Web UI for certificate management and monitoring
 
 # Usage
-Certbot-controller is designed to operate as close to certbot’s docker image as possible, however non-root configuration and extra tools are an operational requirement. The majority of features are optional, including, “always up” cron scheduling, packaged renewal-hooks, plugin installs, etc. By design this should swap into existing workflows, with the exception of running as root.
+Certbot-controller is designed to operate as close to certbot’s docker image as possible, however non-root configuration and extra tools are an operational requirement. The majority of features are optional, including, “always up” cron scheduling, packaged renewal-hooks, plugin installs, etc. By design this should swap into existing workflows, with the exception of running as root or docker user.
 
 ### Unsolicited Advice
 If this is the first time using certbot, I would recommend creating a certificate in Let's Encrypt's staging environment first, by adding ‘--staging’ to the command syntax.  Certbot's public services will throttle duplicate certificates of the same name, limited to 5 certificates over a 7 day period. 
@@ -97,7 +97,7 @@ When only using a custom schedule, the sleep setting is disabled by default to a
 >
 > Cron executes at the scheduled time and the renew process will wait (sleep) to execute. If your sleep is past the next scheduled run, you will get a conflict. For example, if you schedule every 5 minutes and sleep for 12 hours, renew will not execute every 5 minutes, but create a run job every 5 minutes and they will all execute randomly over a 12 hour period.
 >
-> Let say an administrator would like a more routine maintenance windows, a good example is a schedule at 4am with an random sleep of 1 hour. The random sleep is within the 24 hour interval and will not create a conflict. This can be done using a schedule of `0 4 * * *` and sleep `3600`.
+> Let say an administrator would like a more routine maintenance window, a good example is a schedule at 4am with an random sleep of 1 hour. The random sleep is within the 24 hour interval and will not create a conflict. This can be done using a schedule of `0 4 * * *` and sleep `3600`.
 >
 > #### Irregular Intervals
 > Cron intervals can be irregular, for example `* */23 * * *` this does not run every 23 hours, but at 23:00 and at 0:00.  This results in a 23 hour interval followed by 1 hour.
@@ -128,25 +128,26 @@ hooks:
       ssh-keyfile: /config/.ssh/ssh-key-file-name # ssh keys for ssh/scp with direct paths
       timeout: 5 # Optional timeout, default 15 seconds
   deploy:
-    scp: # this section has configuration to scp files to remote connections
-      - connection: waf # links via the connection name in hooks.connections
-        certificates:
-          - name: subdomain.domain.tld
-            path: /path/on/remote/host/ssl/subdomain.domain.tld
-            files:
-              - fullchain.pem
-              - privkey.pem
-          - name: domain.tld
-            path: /path/on/remote/host/ssl/domain.tld
-            files:
-              - domain_tld.pfx
-      - connection: webserver # links via the connection name in hooks.connections
-        certificates:
-          - name: domain.tld
-            path: /path/on/remote/host/ssl/domain.tld
-            files:
-              - fullchain.pem
-              - privkey.pem
+    scp:
+      certificates:
+        - name: subdomain.domain.tld
+          connections:
+            - name: waf # links via the connection name in hooks.connections
+              files:
+                - fullchain.pem
+                - privkey.pem
+              path: /path/on/remote/host/ssl/subdomain.domain.tld # path on the remote host to copy files to
+        - name: domain.tld
+          connections:
+            - name: waf # links via the connection name in hooks.connections
+              files:
+                - domain_tld.pfx
+              path: /path/on/remote/host/ssl/domain.tld # path on the remote host to copy files to
+            - name: webserver # links via the connection name in hooks.connections
+              files:
+                - fullchain.pem
+                - privkey.pem
+              path: /path/on/remote/host/ssl/domain.tld # path on the remote host to copy files to
     pfx:
       certificates: # only certificates in this section will have a PFX file created
         - name: subdomain.domain.tld
@@ -158,32 +159,42 @@ If a hook requires configuration, it can be entered in the above file using yaml
 Certificate names are defined by certbot and executing the command `certificates` will display all current certificates and their state.
 
 ### Testing Renewal-hook Outside of the Renewal Process
-If a script errors or fails while renewing, they can be debugged, tested or rerun outside of the renewal process by directly executing the script. For example from cli:
+If a script errors or fails while renewing, they can be debugged, tested or rerun outside of the renewal process by directly executing the script using additional arguments.
 
+1. Put the container into an always running state by using environment variable `CERTBOT_RENEW_CRON=true`.
+
+2. List all current certificates managed by certbot using:
 ```bash
-docker exec -it certbot-controller /scripts/letsencrypt/renewal-hooks/deploy/<script>.sh --cert-name subdomain.domain.tld
+docker exec -u certbot -it certbot-controller certbot certificates
 ```
 
-Alternatively, shell into the container using bash `docker exec -it certbot-controller /bin/bash` and execute the scripts located in the scripts folder.
+3. List script files for example deploy scripts:
+```bash
+docker exec -u certbot -it certbot-controller ls -l /etc/letsencrypt/renewal-hooks/deploy/
+```
 
-Lastly, current versions of the scripts are displayed using `--version`.
+4. Test and/or execute a script for example `20-scp.sh`:
+```bash
+docker exec -u certbot -it certbot-controller /etc/letsencrypt/renewal-hooks/deploy/20-scp.sh --cert-name subdomain.domain.tld
+```
+
+Alternatively, shell into the container using bash `docker exec -u certbot -it certbot-controller /bin/bash` and execute the scripts located in the hook folders.
 
 > [!NOTE]
-> * All uninstalled scripts are stored under: `/scripts/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`
-> * All installed scripts are stored under: `/etc/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`
+> * All installed scripts are stored under: `/etc/letsencrypt/renewal-hooks/`, `pre`, `post` and `deploy`.
 
 > [!IMPORTANT]
-> Shelling into the docker container using this method will be run as `root`, so if permissions are incorrect, it will be a false positive. It is also not recommended to create/renew certificates using this method, because it can break permissions on certificate files.
+> Using `docker exec` will execute by default as `root` therefore its recommended to use `-u certbot` or `--user certbot` for all commands to prevent false positive results or certificate permission issues.
 
 ### Creating SSH Keys
 If the renewal-hook script requires ssh keys, the following is a brief description on how to create them:
 
-#### Executed on client/certbot-controller Linux host
+#### Execute on the certbot-controller host
 ```bash
 ssh-keygen -t rsa -C "username@certbot-controller" -f config/.ssh/username-remotename
 cat config/.ssh/username-remotename.pub
 ```
-#### Add the public key to the remote server for example in Linux
+#### Add the public key to the remote server for example
 ```bash
 mkdir ~/.ssh
 vi ~/.ssh/authorized_keys
@@ -212,7 +223,7 @@ When using the SCP renewal-hook, files are transferred using the **remote user**
 To configure correct permissions on the remote host, there are several options, however, for security reasons, the following is recommended:
 * Do not use a high privileged user for example root or critical services owner
 * Create a user specifically for certificate management/transfer and only give it permissions to destination files or paths its transferring to
-* Shared access between applications and containers via groups and make the user a member
+* Share access between applications and containers via groups and make the user a member
 * Set permissions at a minimal, file permissions are not changed on the remote server when transferring files
 
 > [!CAUTION]

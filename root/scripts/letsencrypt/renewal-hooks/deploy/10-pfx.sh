@@ -26,8 +26,8 @@
 ##############################################################################
 #                                 VERSIONING                                 #
 ##############################################################################
-VERSION="1.2"
-DATE="2026-08-31 13:35 UTC"
+VERSION="1.3"
+DATE="2026-10-15 12:41 UTC"
 AUTHOR="Soleous (https://github.com/soleous)"
 
 ##############################################################################
@@ -68,7 +68,13 @@ main() {
     fi
   fi
 
-  echo "info: executing $(basename "$0") script"
+  # execution info - report user, for cli execution
+  if [[ -n "$ARG_CERT_NAME" ]]; then
+    echo "info: executing $(basename "$0") script as '$(whoami)'"
+  else
+    echo "info: executing $(basename "$0") script"
+  fi
+
 
   # read hooks.deploy.pfx block from certbot-controller.yaml
   PFX_YAML=$(yq '.hooks.deploy.pfx' ${SCP_CONFIG_FILE})
