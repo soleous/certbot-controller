@@ -199,8 +199,7 @@ vi ~/.ssh/authorized_keys
 > [!TIP]
 > The ssh keys should be added to the correct user on the remote server.
 
-3. Validate the ssh keys
-the following should connect successfully without requiring a password.
+3. Validate the ssh keys by connecting over SSH. It should connect successfully without requiring a password.
 ```bash
 ssh -i config/.ssh/username-remotename username@server
 ```
