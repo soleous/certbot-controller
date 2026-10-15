@@ -61,8 +61,8 @@ When multiple certificates of the same name are created certbot will add a ‘-0
 | CERTBOT_RENEW_RUNONSTART | false | true | Runs renewal when the container starts. |
 | CERTBOT_RENEW_SYNTAX | none | `--deploy /config/hook.sh` | Extra syntax, for when 'certbot renew' is executed. |
 | CERTBOT_RENEW_CRON | false | true | Enables cron scheduling and the container will not exit after execution. |
-| CERTBOT_RENEW_CRON_SCHEDULE | `0 */12 * * *` (every 12th hour) | `0 0 * * *` | Set [crontab](https://man7.org/linux/man-pages/man5/crontab.5.html) schedule to a custom value. **See [below](#Certbot-Controller-Renew-ScheduleCron) before continuing**.|
-| CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 86400 | A sleep period (in seconds) is added to the cronjob and randomizes the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0. **See [below](#Certbot-Controller-Renew-ScheduleCron) before continuing**. |
+| CERTBOT_RENEW_CRON_SCHEDULE | `0 */12 * * *` (every 12th hour) | `0 0 * * *` | Set [crontab](https://man7.org/linux/man-pages/man5/crontab.5.html) schedule to a custom value. **See [below](#Renew-ScheduleCron) before continuing**.|
+| CERTBOT_RENEW_CRON_MAX_SLEEPTIME | 43199 (12 hours) | 86400 | A sleep period (in seconds) is added to the cronjob and randomizes the execution to prevent throttling 'Let's Encrypt' servers.  It can be disabled for testing with 0. **See [below](#Renew-ScheduleCron) before continuing**. |
 
 ## Certbot Official Plugins
 Official plugins are installed by download from certbot's github repository.  Default plugin names can be found in certbot's github using their directory or release name (kebab-case "-" or "_" are both accepted). For Example cloudflare's name is "certbot-dns-cloudflare" so the plugin name is "certbot-dns-cloudflare" or "certbot_dns_cloudflare".  All default plugins must be available as an asset in their releases.
@@ -74,10 +74,10 @@ Custom plugins can be installed by placing them, uncompressed, in a folder withi
 
 For more information when debugging plugins, set **'CERTBOT_PLUGIN_DEBUG'** to 'true' and debug logs will be stored in `/config/logs/plugin-install`.
 
-## Certbot-Controller Renew Options
+## Renew Options
 Renewal's can operate as the stock docker image by command using "renew" after certificates have been created. However certbot-controller adds environmental variable **'CERTBOT_RENEW_RUNONSTART'** that will run renewal when the container starts. When finished it will exit, unless **'CERTBOT_RENEW_CRON'** is 'true', which will enable the cron services using certbot recommended configuration.  The **'CERTBOT_RENEW_SYNTAX'** variable adds additional syntax for the renewal command, for example `--deploy /config/hook.sh`.
 
-## Certbot-Controller Renew Schedule/Cron
+## Renew Schedule/Cron
 Certbot-Controller's default and certbot's recommended cron schedule is `0 */12 * * *` (the 12th hour) with a random sleep between 0 and 43,199 (12 Hours), functionally executing randomly in a 12 hour interval. 
 
 ### Customization
@@ -104,32 +104,36 @@ When only using a custom schedule, the sleep setting is disabled by default to a
 >
 > When setting a sleep period for an irregular interval, to avoid conflicts set the sleep period to the minimum interval, for the above bad example, a maximum sleep of 1 hour will prevent a conflict.
 
-## Certbot-Controller Renewal Hooks
-Renewal Hooks are scripts that execute on renewal of a certificate.  They automate common tasks such as creating PFX files or deploying the certificates. For more information on hooks see the following [certbot documentation](https://eff-certbot.readthedocs.io/en/stable/using.html#renewing-certificates).
+## Packaged Renewal Hooks
+Renewal hooks are scripts that execute at different stages of the renewal process of a certificate.  They automate common tasks such as creating PFX files, stopping and starting services or deploying the certificate. For more information on hooks see the following [certbot documentation](https://eff-certbot.readthedocs.io/en/stable/using.html#renewing-certificates). 
 
-Packaged with certbot-controller are the following hooks, however they are not installed by default, they are enabled by setting **'HOOK_INSTALL'** to 'true'.
+Packaged with certbot-controller are several customizable renewal hooks listed below.
 
-### Renewal Hook: SCP
+These renewal hooks are not installed by default, they can be enabled by setting environmental variable **'HOOK_INSTALL'** to 'true'.
 
-Used to deploy certificate files using secure copy protocol (SCP) to remote servers.
+#### Renewal Hook: SCP
 
-When using the SCP renewal hook, files are transferred using the **remote user** and therefore **permissions** on the **remote host**.  If this **remote user** does not have correct permissions to the destination, expect a `Permission denied`.
+An automation to deploy certificate files using secure copy protocol (SCP) to remote servers using an SSH session. 
+
+This renewal hook relies on SSH keys for authentication. Configuration of the remote server is needed to import/export these keys, for more information see [Creating SSH Keys](#Creating-SSH-Keys).
+
+Files are transferred using the **remote user** and **permissions** on the **remote host**.  If this **remote user** does not have correct permissions to the destination, expect a `Permission denied`.
 
 To configure correct permissions on the remote host, there are several options, however, for security reasons, the following is recommended:
 * Do not use a high privileged user for example root or critical services owner
 * Create a user specifically for certificate management/transfer and only give it permissions to destination files or paths its transferring to
 * Share access between applications and containers via groups and make the user a member
 * Set permissions at a minimal, file permissions are not changed on the remote server when transferring files
+* Restrict network access to SSH
 
 > [!CAUTION]
 > Use at your own risk, the biggest recommendation is to understand your architecture and assess the risks of your configuration.  We take no liability.
 
+#### Renewal Hook: PFX
 
-### Renewal Hook: PFX
+An automation to create certificate files using the PFX (PKCS#12) format.
 
-Used to create certificate files using the PFX (PKCS#12) format.
-
-### Configuration
+### Configuring Renewal Hooks
 All hook configurations packed with certbot-controller are located in `\config\certbot-controller.yaml` using yaml.
 
 ```YAML
@@ -171,12 +175,34 @@ hooks:
           password: super-secret-password #optional, default is the file name without extension
 
 ```
-Configuration can link to different yaml blocks, for example scp connections, link to the connections block. If you do not require for example pfx file creation, this section can be deleted from your yaml file.
+Configuration can link to different yaml blocks, for example SCP certificate connections link to the connections block by name.
 
 Certificate names are not always the domain name.  To view all certificates managed by certbot run `certbot certificates` for example:
 
 ```bash
 docker exec -u certbot -it certbot-controller certbot certificates
+```
+
+### Creating SSH Keys
+If the renewal hook script requires ssh keys, the following is a brief description on how to create them:
+
+1. Create an ssh key pair on the certbot-controller host
+```bash
+ssh-keygen -t rsa -C "username@certbot-controller" -f config/.ssh/username-remotename
+cat config/.ssh/username-remotename.pub
+```
+2. Add the public key to the remote server for example
+```bash
+mkdir ~/.ssh
+vi ~/.ssh/authorized_keys
+```
+> [!TIP]
+> The ssh keys should be added to the correct user on the remote server.
+
+3. Validate the ssh keys
+the following should connect successfully without requiring a password.
+```bash
+ssh -i config/.ssh/username-remotename username@server
 ```
 
 ### Testing Renewal Hook Outside of the Renewal Process
@@ -206,28 +232,6 @@ Alternatively, shell into the container using bash `docker exec -u certbot -it c
 
 > [!IMPORTANT]
 > Using `docker exec` will execute by default as `root` therefore its recommended to use `-u certbot` or `--user certbot` for all commands to prevent false positive results or certificate permission issues.
-
-### Creating SSH Keys
-If the renewal hook script requires ssh keys, the following is a brief description on how to create them:
-
-#### Execute on the certbot-controller host
-```bash
-ssh-keygen -t rsa -C "username@certbot-controller" -f config/.ssh/username-remotename
-cat config/.ssh/username-remotename.pub
-```
-#### Add the public key to the remote server for example
-```bash
-mkdir ~/.ssh
-vi ~/.ssh/authorized_keys
-```
-> [!TIP]
-> The ssh keys should be added to the correct user on the remote server.
-
-#### Validate the ssh keys
-the following should connect successfully without requiring a password.
-```bash
-ssh -i config/.ssh/username-remotename username@server
-```
 
 ## Certbot-Controller Logging
 Log outputs are verbose, therefore executing `certbot logs container-name` will display container history and current certificate renewals, including schedule of the next run.
